@@ -1,0 +1,350 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&display=swap');
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: #ffffff;
+  color: #111;
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  min-height: 100vh;
+}
+
+/* ── Header ── */
+
+header {
+  padding: 60px 40px 0;
+  text-align: center;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+h1 {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-weight: 300;
+  font-size: clamp(1.8rem, 6vw, 4.5rem);
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: #111;
+}
+
+.subheading {
+  font-size: 0.75rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: #999;
+  margin-top: 10px;
+}
+
+nav {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 36px;
+}
+
+.nav-btn {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 12px 24px;
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 0.75rem;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: #999;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+  position: relative;
+  bottom: -1px;
+}
+
+.nav-btn:hover { color: #111; }
+.nav-btn.active { color: #111; border-bottom: 2px solid #111; }
+
+/* ── Main ── */
+
+main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 50px 40px;
+}
+
+/* ── Upload area ── */
+
+.upload-area {
+  border: 1px solid #ccc;
+  border-radius: 2px;
+  padding: 50px 30px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  margin-bottom: 60px;
+}
+
+.upload-area.hidden { display: none; }
+
+.upload-area.drag-over {
+  border-color: #111;
+  background: #f9f9f9;
+}
+
+.upload-area p {
+  font-size: 0.85rem;
+  letter-spacing: 0.1em;
+  color: #888;
+  margin-bottom: 18px;
+  text-transform: uppercase;
+}
+
+button#browseBtn {
+  background: #111;
+  color: #fff;
+  border: none;
+  padding: 12px 32px;
+  font-family: inherit;
+  font-size: 0.75rem;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+button#browseBtn:hover { background: #444; }
+
+/* ── Gallery ── */
+
+.gallery {
+  columns: 2 280px;
+  column-gap: 20px;
+}
+
+.gallery-item {
+  break-inside: avoid;
+  margin-bottom: 20px;
+  position: relative;
+}
+
+.gallery-item img,
+.gallery-item canvas {
+  width: 100%;
+  display: block;
+  border: 1px solid #e8e8e8;
+}
+
+.gallery-item .remove-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(255,255,255,0.9);
+  border: 1px solid #ccc;
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.gallery-item:hover .remove-btn { opacity: 1; }
+
+/* In view mode (no ?edit), hide remove buttons */
+body.view-mode .remove-btn { display: none; }
+
+.art-title {
+  display: block;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid #e0e0e0;
+  padding: 8px 2px;
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 1rem;
+  letter-spacing: 0.1em;
+  color: #111;
+  background: transparent;
+  outline: none;
+  margin-top: 8px;
+}
+
+/* In view mode, title inputs look like plain text */
+body.view-mode .art-title {
+  pointer-events: none;
+  border-bottom-color: transparent;
+  color: #555;
+}
+
+body.view-mode .art-title:placeholder-shown {
+  display: none;
+}
+
+.art-title::placeholder { color: #bbb; }
+.art-title:focus { border-bottom-color: #111; }
+
+.pdf-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #999;
+  margin-top: 6px;
+  text-align: center;
+}
+
+/* ── Toolbar (floating, bottom-right) ── */
+
+.toolbar {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  display: flex;
+  gap: 10px;
+  z-index: 100;
+}
+
+.toolbar-btn {
+  background: #111;
+  color: #fff;
+  border: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  transition: background 0.2s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+}
+
+.toolbar-btn:hover { background: #444; }
+
+/* In edit mode, pencil button points back to gallery */
+body.edit-mode #editLink::after { content: ''; }
+
+/* ── QR Modal ── */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+
+.modal-overlay.hidden { display: none; }
+
+.modal {
+  background: #fff;
+  padding: 40px;
+  text-align: center;
+  position: relative;
+  max-width: 300px;
+  width: 90%;
+}
+
+.modal-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  background: none;
+  border: none;
+  font-size: 1.4rem;
+  cursor: pointer;
+  color: #999;
+}
+
+.modal-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #999;
+  margin-bottom: 20px;
+}
+
+#qrCode {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.modal-hint {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  color: #999;
+  margin-bottom: 14px;
+  text-transform: uppercase;
+}
+
+.modal-hint.small { font-size: 0.65rem; margin-top: 14px; margin-bottom: 0; text-transform: none; }
+.modal-hint code { background: #f4f4f4; padding: 2px 5px; font-size: 0.65rem; }
+
+.ip-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-bottom: 14px;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  color: #555;
+}
+
+.ip-row input {
+  border: 1px solid #ccc;
+  padding: 6px 8px;
+  font-family: monospace;
+  font-size: 0.85rem;
+  width: 130px;
+  outline: none;
+  text-align: center;
+}
+
+.ip-row input:focus { border-color: #111; }
+
+#generateQr {
+  background: #111;
+  color: #fff;
+  border: none;
+  padding: 10px 24px;
+  font-family: inherit;
+  font-size: 0.72rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+#generateQr:hover { background: #444; }
+
+.modal-url {
+  font-size: 0.7rem;
+  color: #bbb;
+  letter-spacing: 0.05em;
+  word-break: break-all;
+}
+
+/* ── Responsive ── */
+
+@media (max-width: 600px) {
+  header { padding: 40px 20px 0; }
+
+  h1 { letter-spacing: 0.2em; }
+
+  .nav-btn { padding: 10px 14px; font-size: 0.7rem; letter-spacing: 0.15em; }
+
+  main { padding: 30px 16px; }
+
+  .gallery { columns: 1; }
+
+  .upload-area { padding: 36px 20px; }
+
+  .toolbar { bottom: 20px; right: 16px; }
+}

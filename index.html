@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lorelai Blume</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>LORELAI BLUME</h1>
+    <p class="subheading">Art Portfolio</p>
+    <nav>
+      <button class="nav-btn active" data-category="digital">Digital Art</button>
+      <button class="nav-btn" data-category="watercolor">Watercolor</button>
+      <button class="nav-btn" data-category="drawings">Drawings</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Only visible when ?edit is in the URL -->
+    <div class="upload-area hidden" id="uploadArea">
+      <input type="file" id="fileInput" accept="image/*,.pdf" multiple hidden />
+      <p>Drop images or PDFs here</p>
+      <button id="browseBtn">Browse Files</button>
+    </div>
+
+    <div class="gallery" id="gallery"></div>
+  </main>
+
+  <!-- Toolbar: edit link + QR button -->
+  <div class="toolbar" id="toolbar">
+    <a class="toolbar-btn" id="editLink" href="?edit" title="Add art">✎</a>
+    <button class="toolbar-btn" id="qrBtn" title="Share on phone">⬡</button>
+  </div>
+
+  <!-- QR modal -->
+  <div class="modal-overlay hidden" id="qrModal">
+    <div class="modal">
+      <button class="modal-close" id="qrClose">×</button>
+      <p class="modal-label">Open on your phone</p>
+      <div id="qrSetup">
+        <p class="modal-hint">Paste your computer's IP address:</p>
+        <div class="ip-row">
+          <span class="ip-prefix">http://</span>
+          <input id="ipInput" type="text" placeholder="192.168.x.x" />
+          <span class="ip-suffix">:8765</span>
+        </div>
+        <button id="generateQr">Generate QR</button>
+        <p class="modal-hint small">Find your IP: open Terminal and run <code>ipconfig getifaddr en0</code></p>
+      </div>
+      <div id="qrCode" class="hidden"></div>
+      <p class="modal-url" id="qrUrl"></p>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
