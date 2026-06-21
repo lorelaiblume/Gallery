@@ -234,33 +234,19 @@ const generateQrBtn = document.getElementById('generateQr');
 const ipInput = document.getElementById('ipInput');
 const qrSetup = document.getElementById('qrSetup');
 
+let qrGenerated = false;
 qrBtn.addEventListener('click', () => {
-  if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+  if (!qrGenerated) {
     const url = window.location.origin;
     qrCodeEl.innerHTML = '';
-    qrCodeEl.classList.remove('hidden');
-    if (qrSetup) qrSetup.classList.add('hidden');
     qrUrlEl.textContent = url;
     new QRCode(qrCodeEl, { text: url, width: 200, height: 200, colorDark: '#111', colorLight: '#fff' });
+    qrGenerated = true;
   }
   qrModal.classList.remove('hidden');
 });
 
-qrClose.addEventListener('click', () => qrModal.classList.add('hidden'));
-qrModal.addEventListener('click', e => { if (e.target === qrModal) qrModal.classList.add('hidden'); });
-
-generateQrBtn?.addEventListener('click', () => {
-  const ip = ipInput.value.trim();
-  if (!ip) { ipInput.focus(); return; }
-  const url = `http://${ip}:8765`;
-  qrCodeEl.innerHTML = '';
-  qrCodeEl.classList.remove('hidden');
-  qrSetup.classList.add('hidden');
-  qrUrlEl.textContent = url;
-  new QRCode(qrCodeEl, { text: url, width: 200, height: 200, colorDark: '#111', colorLight: '#fff' });
-});
-
-ipInput?.addEventListener('keydown', e => { if (e.key === 'Enter') generateQrBtn.click(); });
+qrModal.addEventListener('click', () => qrModal.classList.add('hidden'));
 
 function loadScript(src) {
   return new Promise((resolve, reject) => {

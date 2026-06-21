@@ -36,21 +36,8 @@
   </div>
 
   <div class="modal-overlay hidden" id="qrModal">
-    <div class="modal">
-      <button class="modal-close" id="qrClose">×</button>
-      <p class="modal-label">Open on your phone</p>
-      <div id="qrSetup">
-        <p class="modal-hint">Paste your computer's IP address:</p>
-        <div class="ip-row">
-          <span class="ip-prefix">http://</span>
-          <input id="ipInput" type="text" placeholder="192.168.x.x" />
-          <span class="ip-suffix">:8765</span>
-        </div>
-        <button id="generateQr">Generate QR</button>
-        <p class="modal-hint small">Find your IP: open Terminal and run <code>ipconfig getifaddr en0</code></p>
-      </div>
-      <div id="qrCode" class="hidden"></div>
-      <p class="modal-url" id="qrUrl"></p>
+    <div class="modal qr-only">
+      <div id="qrCode"></div>
     </div>
   </div>
 

@@ -278,6 +278,12 @@ body.edit-mode #editLink::after { content: ''; }
   width: 90%;
 }
 
+.modal.qr-only {
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
+}
+
 .modal-close {
   position: absolute;
   top: 12px;
