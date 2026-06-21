@@ -239,7 +239,6 @@ qrBtn.addEventListener('click', () => {
   if (!qrGenerated) {
     const url = window.location.origin;
     qrCodeEl.innerHTML = '';
-    qrUrlEl.textContent = url;
     new QRCode(qrCodeEl, { text: url, width: 200, height: 200, colorDark: '#111', colorLight: '#fff' });
     qrGenerated = true;
   }
