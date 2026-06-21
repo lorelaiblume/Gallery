@@ -1,4 +1,18 @@
-// ── URL param: ?edit shows upload UI ─────────────────────────────────────────
+// ── Firebase init ─────────────────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyBqcTGjJDyGk71hrbqo9fQk5Iz82LMuEz0",
+  authDomain: "lorelai-blume-gallery.firebaseapp.com",
+  projectId: "lorelai-blume-gallery",
+  storageBucket: "lorelai-blume-gallery.firebasestorage.app",
+  messagingSenderId: "921923872934",
+  appId: "1:921923872934:web:2177895d7817a267132c67",
+  measurementId: "G-53XC5MSN88"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const storage = firebase.storage();
+
+// ── URL param: ?edit ──────────────────────────────────────────────────────────
 const isEditMode = new URLSearchParams(window.location.search).has('edit');
 
 if (isEditMode) {
@@ -15,146 +29,69 @@ if (isEditMode) {
 // ── Nav ───────────────────────────────────────────────────────────────────────
 const navBtns = document.querySelectorAll('.nav-btn');
 const gallery = document.getElementById('gallery');
+const loadingMsg = document.getElementById('loadingMsg');
 let currentCategory = 'digital';
+let unsubscribe = null;
 
 navBtns.forEach(btn => {
   btn.addEventListener('click', () => {
     navBtns.forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     currentCategory = btn.dataset.category;
-    renderGallery(currentCategory);
+    listenToGallery(currentCategory);
   });
 });
 
-// ── IndexedDB ─────────────────────────────────────────────────────────────────
-let db;
-const DB_NAME = 'lorelai-gallery-v2';
-const STORE = 'pieces';
+// ── Real-time gallery listener ────────────────────────────────────────────────
+function listenToGallery(category) {
+  if (unsubscribe) unsubscribe();
+  gallery.innerHTML = '<div class="loading" id="loadingMsg">Loading...</div>';
 
-function openDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = e => {
-      const store = e.target.result.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true });
-      store.createIndex('category', 'category', { unique: false });
-    };
-    req.onsuccess = e => resolve(e.target.result);
-    req.onerror = reject;
-  });
+  unsubscribe = db.collection('pieces')
+    .where('category', '==', category)
+    .orderBy('createdAt', 'asc')
+    .onSnapshot(async snapshot => {
+      gallery.innerHTML = '';
+      for (const doc of snapshot.docs) {
+        const item = doc.data();
+        item.id = doc.id;
+        if (item.filename && item.filename.endsWith('.pdf')) {
+          await renderPDF(item);
+        } else {
+          renderImage(item);
+        }
+      }
+    }, err => {
+      console.error(err);
+      gallery.innerHTML = '<p style="color:#999;text-align:center;padding:40px">Error loading gallery.</p>';
+    });
 }
 
-function saveItem(data) {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE, 'readwrite');
-    const req = tx.objectStore(STORE).add(data);
-    req.onsuccess = e => resolve(e.target.result);
-    req.onerror = reject;
-  });
-}
-
-function updateTitle(id, title) {
-  const tx = db.transaction(STORE, 'readwrite');
-  const store = tx.objectStore(STORE);
-  const req = store.get(id);
-  req.onsuccess = e => {
-    const record = e.target.result;
-    if (record) { record.title = title; store.put(record); }
-  };
-}
-
-function deleteItem(id) {
-  const tx = db.transaction(STORE, 'readwrite');
-  tx.objectStore(STORE).delete(id);
-}
-
-function loadByCategory(category) {
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE, 'readonly');
-    const index = tx.objectStore(STORE).index('category');
-    const req = index.getAll(category);
-    req.onsuccess = e => resolve(e.target.result);
-    req.onerror = reject;
-  });
-}
+listenToGallery(currentCategory);
 
 // ── Render ────────────────────────────────────────────────────────────────────
-async function renderGallery(category) {
-  gallery.innerHTML = '';
-  const items = await loadByCategory(category);
-  for (const item of items) {
-    if (item.fileType === 'pdf') {
-      await renderPDFData(item.data, item.id, item.title);
-    } else {
-      renderImageData(item.data, item.id, item.title);
-    }
-  }
-}
-
-(async () => {
-  db = await openDB();
-  renderGallery(currentCategory);
-})();
-
-// ── Upload ────────────────────────────────────────────────────────────────────
-const uploadArea = document.getElementById('uploadArea');
-const fileInput = document.getElementById('fileInput');
-const browseBtn = document.getElementById('browseBtn');
-
-browseBtn?.addEventListener('click', () => fileInput.click());
-fileInput?.addEventListener('change', e => handleFiles(e.target.files));
-
-uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
-uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
-uploadArea.addEventListener('drop', e => {
-  e.preventDefault();
-  uploadArea.classList.remove('drag-over');
-  handleFiles(e.dataTransfer.files);
-});
-
-function handleFiles(files) {
-  [...files].forEach(async file => {
-    if (file.type === 'application/pdf') {
-      const buf = await file.arrayBuffer();
-      const id = await saveItem({ fileType: 'pdf', data: buf, title: '', category: currentCategory });
-      await renderPDFData(buf, id, '');
-    } else if (file.type.startsWith('image/')) {
-      const dataURL = await toDataURL(file);
-      const id = await saveItem({ fileType: 'image', data: dataURL, title: '', category: currentCategory });
-      renderImageData(dataURL, id, '');
-    }
-  });
-}
-
-function toDataURL(file) {
-  return new Promise(resolve => {
-    const reader = new FileReader();
-    reader.onload = e => resolve(e.target.result);
-    reader.readAsDataURL(file);
-  });
-}
-
-function renderImageData(dataURL, id, title) {
-  const item = createItem(id, title);
+function renderImage(item) {
+  const el = createItem(item);
   const img = document.createElement('img');
-  img.src = dataURL;
-  item.insertBefore(img, item.querySelector('.art-title'));
-  gallery.appendChild(item);
+  img.src = item.url;
+  el.insertBefore(img, el.querySelector('.art-title'));
+  gallery.appendChild(el);
 }
 
-async function renderPDFData(buf, id, title) {
+async function renderPDF(item) {
   if (!window.pdfjsLib) {
     await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
     window.pdfjsLib.GlobalWorkerOptions.workerSrc =
       'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   }
-  const pdf = await pdfjsLib.getDocument({ data: buf.slice(0) }).promise;
+  const pdf = await pdfjsLib.getDocument(item.url).promise;
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const viewport = page.getViewport({ scale: 2 });
     const canvas = document.createElement('canvas');
     canvas.width = viewport.width; canvas.height = viewport.height;
     await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-    const el = createItem(i === 1 ? id : null, i === 1 ? title : '');
+    const el = createItem(i === 1 ? item : null, i === 1 ? item.title : '');
     el.insertBefore(canvas, el.querySelector('.art-title'));
     if (pdf.numPages > 1) {
       const label = document.createElement('p');
@@ -166,15 +103,20 @@ async function renderPDFData(buf, id, title) {
   }
 }
 
-function createItem(id, title) {
+function createItem(item, titleOverride) {
   const el = document.createElement('div');
   el.className = 'gallery-item';
 
   const removeBtn = document.createElement('button');
   removeBtn.className = 'remove-btn';
   removeBtn.textContent = '×';
-  removeBtn.addEventListener('click', () => {
-    if (id != null) deleteItem(id);
+  removeBtn.addEventListener('click', async () => {
+    if (item) {
+      await db.collection('pieces').doc(item.id).delete();
+      if (item.storagePath) {
+        try { await storage.ref(item.storagePath).delete(); } catch {}
+      }
+    }
     el.remove();
   });
   el.appendChild(removeBtn);
@@ -183,12 +125,103 @@ function createItem(id, title) {
   titleInput.type = 'text';
   titleInput.className = 'art-title';
   titleInput.placeholder = 'Title';
-  titleInput.value = title || '';
-  if (id != null) {
-    titleInput.addEventListener('input', () => updateTitle(id, titleInput.value));
+  titleInput.value = (titleOverride !== undefined ? titleOverride : item?.title) || '';
+  if (item) {
+    let timer;
+    titleInput.addEventListener('input', () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        db.collection('pieces').doc(item.id).update({ title: titleInput.value });
+      }, 500);
+    });
   }
   el.appendChild(titleInput);
   return el;
+}
+
+// ── Upload ────────────────────────────────────────────────────────────────────
+const uploadArea = document.getElementById('uploadArea');
+const fileInput = document.getElementById('fileInput');
+const browseBtn = document.getElementById('browseBtn');
+
+browseBtn?.addEventListener('click', () => fileInput.click());
+fileInput?.addEventListener('change', e => handleFiles(e.target.files));
+uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
+uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
+uploadArea.addEventListener('drop', e => { e.preventDefault(); uploadArea.classList.remove('drag-over'); handleFiles(e.dataTransfer.files); });
+
+async function uploadFile(file, category) {
+  const ext = file.name.split('.').pop();
+  const storagePath = `pieces/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+  const ref = storage.ref(storagePath);
+  await ref.put(file);
+  const url = await ref.getDownloadURL();
+  const doc = await db.collection('pieces').add({
+    url,
+    storagePath,
+    filename: file.name,
+    category,
+    title: '',
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
+  return { id: doc.id, url, storagePath, filename: file.name, category, title: '' };
+}
+
+async function handleFiles(files) {
+  for (const file of files) {
+    if (!file.type.startsWith('image/') && file.type !== 'application/pdf') continue;
+    await uploadFile(file, currentCategory);
+    // onSnapshot will update the gallery automatically
+  }
+}
+
+// ── Bulk import from IndexedDB ────────────────────────────────────────────────
+const bulkImportBtn = document.getElementById('bulkImportBtn');
+bulkImportBtn?.addEventListener('click', async () => {
+  bulkImportBtn.textContent = 'Importing...';
+  bulkImportBtn.disabled = true;
+  try {
+    const items = await getIndexedDBItems();
+    if (items.length === 0) {
+      alert('No art found in local browser storage!');
+      bulkImportBtn.textContent = 'Bulk Import from This Browser';
+      bulkImportBtn.disabled = false;
+      return;
+    }
+    let count = 0;
+    for (const item of items) {
+      const blob = item.fileType === 'pdf'
+        ? new Blob([item.data], { type: 'application/pdf' })
+        : await fetch(item.data).then(r => r.blob());
+      const ext = item.fileType === 'pdf' ? 'pdf' : 'jpg';
+      const file = new File([blob], `art_${Date.now()}.${ext}`, { type: blob.type });
+      await uploadFile(file, item.category || 'digital');
+      if (item.title) {
+        // title will be updated after upload via onSnapshot — we handle it separately
+      }
+      count++;
+      bulkImportBtn.textContent = `Importing... (${count}/${items.length})`;
+    }
+    alert(`Done! Imported ${count} pieces.`);
+  } catch (e) {
+    alert('Import failed: ' + e.message);
+  }
+  bulkImportBtn.textContent = 'Bulk Import from This Browser';
+  bulkImportBtn.disabled = false;
+});
+
+function getIndexedDBItems() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('lorelai-gallery-v2');
+    req.onerror = () => resolve([]);
+    req.onsuccess = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('pieces')) { resolve([]); return; }
+      const tx = db.transaction('pieces', 'readonly');
+      tx.objectStore('pieces').getAll().onsuccess = ev => resolve(ev.target.result || []);
+    };
+    req.onupgradeneeded = () => resolve([]);
+  });
 }
 
 // ── QR Code ───────────────────────────────────────────────────────────────────
@@ -202,7 +235,6 @@ const ipInput = document.getElementById('ipInput');
 const qrSetup = document.getElementById('qrSetup');
 
 qrBtn.addEventListener('click', () => {
-  // If on a real domain, just QR the current URL
   if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
     const url = window.location.origin;
     qrCodeEl.innerHTML = '';

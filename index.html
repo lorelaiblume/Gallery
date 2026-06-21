@@ -18,23 +18,23 @@
   </header>
 
   <main>
-    <!-- Only visible when ?edit is in the URL -->
     <div class="upload-area hidden" id="uploadArea">
       <input type="file" id="fileInput" accept="image/*,.pdf" multiple hidden />
       <p>Drop images or PDFs here</p>
       <button id="browseBtn">Browse Files</button>
+      <button id="bulkImportBtn">Bulk Import from This Browser</button>
     </div>
 
-    <div class="gallery" id="gallery"></div>
+    <div class="gallery" id="gallery">
+      <div class="loading" id="loadingMsg">Loading...</div>
+    </div>
   </main>
 
-  <!-- Toolbar: edit link + QR button -->
   <div class="toolbar" id="toolbar">
     <a class="toolbar-btn" id="editLink" href="?edit" title="Add art">✎</a>
     <button class="toolbar-btn" id="qrBtn" title="Share on phone">⬡</button>
   </div>
 
-  <!-- QR modal -->
   <div class="modal-overlay hidden" id="qrModal">
     <div class="modal">
       <button class="modal-close" id="qrClose">×</button>
@@ -54,6 +54,10 @@
     </div>
   </div>
 
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="app.js"></script>
 </body>
