@@ -11,20 +11,52 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const storage = firebase.storage();
+const auth = firebase.auth();
+const OWNER_EMAIL = 'lorelaiblume@gmail.com';
 
-// ── URL param: ?edit ──────────────────────────────────────────────────────────
-const isEditMode = new URLSearchParams(window.location.search).has('edit');
+// ── Auth ──────────────────────────────────────────────────────────────────────
+const editLink = document.getElementById('editLink');
+const uploadArea = document.getElementById('uploadArea');
 
-if (isEditMode) {
+function enterEditMode() {
+  document.body.classList.remove('view-mode');
   document.body.classList.add('edit-mode');
-  document.getElementById('uploadArea').classList.remove('hidden');
-  document.getElementById('editLink').href = window.location.pathname;
-  document.getElementById('editLink').title = 'Back to gallery';
-  document.getElementById('editLink').textContent = '✕';
-} else {
-  document.body.classList.add('view-mode');
-  document.getElementById('editLink').href = '?edit';
+  uploadArea.classList.remove('hidden');
+  editLink.textContent = '✕';
+  editLink.title = 'Exit edit mode';
 }
+
+function exitEditMode() {
+  document.body.classList.remove('edit-mode');
+  document.body.classList.add('view-mode');
+  uploadArea.classList.add('hidden');
+  editLink.textContent = '✎';
+  editLink.title = 'Edit gallery';
+}
+
+document.body.classList.add('view-mode');
+
+editLink.addEventListener('click', async e => {
+  e.preventDefault();
+  if (document.body.classList.contains('edit-mode')) {
+    await auth.signOut();
+    exitEditMode();
+    return;
+  }
+  // Not in edit mode — sign in
+  const provider = new firebase.auth.GoogleAuthProvider();
+  try {
+    const result = await auth.signInWithPopup(provider);
+    if (result.user.email === OWNER_EMAIL) {
+      enterEditMode();
+    } else {
+      await auth.signOut();
+      alert('Sorry, only Lorelai can edit this gallery!');
+    }
+  } catch (e) {
+    console.error(e);
+  }
+});
 
 // ── Nav ───────────────────────────────────────────────────────────────────────
 const navBtns = document.querySelectorAll('.nav-btn');
@@ -140,7 +172,6 @@ function createItem(item, titleOverride) {
 }
 
 // ── Upload ────────────────────────────────────────────────────────────────────
-const uploadArea = document.getElementById('uploadArea');
 const fileInput = document.getElementById('fileInput');
 const browseBtn = document.getElementById('browseBtn');
 
