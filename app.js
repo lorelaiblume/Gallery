@@ -394,8 +394,6 @@ document.addEventListener('keydown', e => {
 });
 
 // ── Commentary display ────────────────────────────────────────────────────────
-let commentaryHideTimer = null;
-
 function checkCommentary(video) {
   if (!allCommentary.length) return;
   const t = video.currentTime;
@@ -403,10 +401,10 @@ function checkCommentary(video) {
 
   for (let i = 0; i < allCommentary.length; i++) {
     const c = allCommentary[i];
-    const nextT = i < allCommentary.length - 1
-      ? allCommentary[i + 1].timestamp
-      : c.timestamp + 3;
-    if (t >= c.timestamp && t < nextT) { activeComment = c; break; }
+    const nextT = i < allCommentary.length - 1 ? allCommentary[i + 1].timestamp : Infinity;
+    // Show for 3 seconds, or until the next comment — whichever comes first
+    const endT = Math.min(c.timestamp + 3, nextT);
+    if (t >= c.timestamp && t < endT) { activeComment = c; break; }
   }
 
   const display = document.getElementById('commentaryDisplay');
@@ -416,46 +414,23 @@ function checkCommentary(video) {
     if (activeCommentId !== activeComment.id) {
       const wasActive = activeCommentId !== null;
       activeCommentId = activeComment.id;
-
-      // Clear any pending hide timer
-      if (commentaryHideTimer) { clearTimeout(commentaryHideTimer); commentaryHideTimer = null; }
-
       if (wasActive) {
         display.classList.remove('active');
         setTimeout(() => {
           textEl.textContent = activeComment.text;
           display.classList.add('active');
-          scheduleCommentaryHide(display, activeComment);
         }, 380);
       } else {
         textEl.textContent = activeComment.text;
         display.classList.add('active');
-        scheduleCommentaryHide(display, activeComment);
       }
     }
   } else {
     if (activeCommentId !== null) {
       activeCommentId = null;
-      if (commentaryHideTimer) { clearTimeout(commentaryHideTimer); commentaryHideTimer = null; }
       display.classList.remove('active');
     }
   }
-}
-
-function scheduleCommentaryHide(display, comment) {
-  // Find how long until the next comment (capped at 3s)
-  const idx = allCommentary.findIndex(c => c.id === comment.id);
-  const nextT = idx < allCommentary.length - 1 ? allCommentary[idx + 1].timestamp : null;
-  const video = document.getElementById('filmVideo');
-  const remaining = nextT
-    ? Math.min((nextT - video.currentTime) * 1000, 3000)
-    : 3000;
-
-  commentaryHideTimer = setTimeout(() => {
-    display.classList.remove('active');
-    activeCommentId = null;
-    commentaryHideTimer = null;
-  }, remaining);
 }
 
 // ── Commentary editor ─────────────────────────────────────────────────────────
