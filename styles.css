@@ -382,3 +382,409 @@ body.edit-mode #editLink::after { content: ''; }
 
   .toolbar { bottom: 20px; right: 16px; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   FILM SECTION
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* Gallery in film mode */
+.gallery.film-mode {
+  columns: unset;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 28px;
+}
+
+/* ── Film cards ── */
+.film-card {
+  cursor: pointer;
+  transition: transform 0.25s ease;
+}
+
+.film-card:hover { transform: translateY(-3px); }
+
+.film-card-thumb {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: #0d0d0d;
+  overflow: hidden;
+  border: 1px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.film-card-thumb-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.8;
+  transition: opacity 0.3s;
+}
+
+.film-card:hover .film-card-thumb-video { opacity: 1; }
+
+.film-card-play-icon {
+  position: relative;
+  z-index: 1;
+  color: rgba(255,255,255,0.45);
+  transition: color 0.2s, transform 0.25s ease;
+  display: flex;
+}
+
+.film-card:hover .film-card-play-icon {
+  color: rgba(255,255,255,0.9);
+  transform: scale(1.1);
+}
+
+.film-card-delete {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  background: rgba(255,255,255,0.92);
+  border: 1px solid #ccc;
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+body.edit-mode .film-card:hover .film-card-delete { opacity: 1; }
+body.view-mode .film-card-delete { display: none; }
+
+.film-card-info { padding: 10px 0 4px; }
+
+.film-card-title {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-weight: 300;
+  font-size: 0.82rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #111;
+}
+
+/* Add film card */
+.film-card-add .film-card-thumb {
+  border: 1px dashed #ccc;
+  background: transparent;
+}
+
+.film-card-plus {
+  font-size: 2rem;
+  font-weight: 200;
+  color: #ccc;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.film-card-add:hover .film-card-plus { color: #999; }
+.film-add-label { color: #aaa; }
+
+/* Upload loading card */
+.film-card-loading .film-card-thumb {
+  flex-direction: column;
+  gap: 10px;
+  background: #0d0d0d;
+}
+
+.film-upload-progress {
+  width: 70%;
+  height: 1px;
+  background: rgba(255,255,255,0.12);
+  position: relative;
+}
+
+.film-upload-bar {
+  height: 100%;
+  width: 0%;
+  background: rgba(255,255,255,0.6);
+  transition: width 0.25s;
+}
+
+.film-upload-pct {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 0.65rem;
+  letter-spacing: 0.2em;
+  color: rgba(255,255,255,0.35);
+  text-transform: uppercase;
+}
+
+/* ── Film modal / player ── */
+.film-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: rgba(0,0,0,0.95);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow-y: auto;
+  padding: 40px 24px 60px;
+}
+
+.film-modal.hidden { display: none; }
+
+/* Prevent body scroll while modal open */
+body.film-playing { overflow: hidden; }
+
+.film-modal-inner {
+  width: 100%;
+  max-width: 860px;
+}
+
+.film-close {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.3);
+  font-size: 1.8rem;
+  cursor: pointer;
+  display: block;
+  margin-left: auto;
+  margin-bottom: 14px;
+  line-height: 1;
+  padding: 0;
+  transition: color 0.2s;
+}
+
+.film-close:hover { color: rgba(255,255,255,0.85); }
+
+/* Video */
+.film-player-wrap {
+  background: #000;
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+#filmVideo {
+  width: 100%;
+  display: block;
+  max-height: 62vh;
+  object-fit: contain;
+  background: #000;
+}
+
+/* ── Commentary ── */
+.commentary-display {
+  min-height: 72px;
+  padding: 18px 26px;
+  background: rgba(0,0,0,0.55);
+  border-top: 1px solid rgba(255,255,255,0.05);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 11px;
+}
+
+.commentary-accent {
+  width: 26px;
+  height: 1px;
+  background: rgba(255,255,255,0.32);
+  transform-origin: left center;
+  transform: scaleX(0);
+  opacity: 0;
+  transition:
+    transform 0.42s cubic-bezier(0.4, 0, 0.2, 1) 0.08s,
+    opacity   0.42s ease                          0.08s;
+}
+
+.commentary-text {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 1.08rem;
+  font-style: italic;
+  letter-spacing: 0.04em;
+  line-height: 1.75;
+  color: rgba(255,255,255,0);       /* starts transparent */
+  transform: translateY(9px);
+  transition:
+    color     0.48s ease 0.26s,
+    transform 0.48s cubic-bezier(0.4, 0, 0.2, 1) 0.26s;
+}
+
+/* Active state — triggers the staggered entrance */
+.commentary-display.active .commentary-accent {
+  transform: scaleX(1);
+  opacity: 1;
+}
+
+.commentary-display.active .commentary-text {
+  color: rgba(255,255,255,0.82);
+  transform: translateY(0);
+}
+
+/* ── Film title (below player) ── */
+.film-modal-meta {
+  padding: 18px 2px 0;
+}
+
+.film-modal-meta h2 {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-weight: 300;
+  font-size: 0.82rem;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.38);
+}
+
+/* ── Editor panel ── */
+.film-editor-panel {
+  margin-top: 32px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  padding-top: 28px;
+}
+
+.film-editor-title-row {
+  margin-bottom: 24px;
+}
+
+.film-editor-title-input {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255,255,255,0.18);
+  color: rgba(255,255,255,0.7);
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 1rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  outline: none;
+  padding: 4px 0;
+  width: 100%;
+  transition: border-color 0.2s;
+}
+
+.film-editor-title-input::placeholder { color: rgba(255,255,255,0.2); }
+.film-editor-title-input:focus { border-bottom-color: rgba(255,255,255,0.45); }
+
+.film-editor-add {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 28px;
+}
+
+#newCommentText {
+  flex: 1;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.13);
+  color: rgba(255,255,255,0.82);
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 1rem;
+  font-style: italic;
+  padding: 11px 13px;
+  resize: vertical;
+  outline: none;
+  min-height: 56px;
+  transition: border-color 0.2s;
+}
+
+#newCommentText::placeholder { color: rgba(255,255,255,0.22); }
+#newCommentText:focus { border-color: rgba(255,255,255,0.38); }
+
+#addCommentAtBtn {
+  background: rgba(255,255,255,0.88);
+  color: #111;
+  border: none;
+  padding: 11px 18px;
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  align-self: flex-start;
+  transition: background 0.2s;
+}
+
+#addCommentAtBtn:hover { background: #fff; }
+
+/* Comment list */
+.film-editor-list { display: flex; flex-direction: column; }
+
+.editor-empty {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-style: italic;
+  font-size: 0.88rem;
+  color: rgba(255,255,255,0.25);
+  letter-spacing: 0.05em;
+  padding: 8px 0;
+}
+
+.editor-comment-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.editor-comment-time {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.3);
+  min-width: 40px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  transition: color 0.2s;
+}
+
+.editor-comment-time:hover { color: rgba(255,255,255,0.75); }
+
+.editor-comment-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid transparent;
+  color: rgba(255,255,255,0.62);
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 1rem;
+  font-style: italic;
+  outline: none;
+  padding: 3px 0;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.editor-comment-input:focus {
+  border-bottom-color: rgba(255,255,255,0.3);
+  color: rgba(255,255,255,0.9);
+}
+
+.editor-comment-delete {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.22);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.editor-comment-delete:hover { color: rgba(220,80,80,0.85); }
+
+/* ── Responsive film ── */
+@media (max-width: 600px) {
+  .gallery.film-mode {
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+
+  .film-modal { padding: 16px 12px 40px; }
+
+  #filmVideo { max-height: 48vw; }
+
+  .commentary-text { font-size: 0.95rem; }
+
+  .film-editor-add { flex-direction: column; }
+  #addCommentAtBtn { width: 100%; text-align: center; }
+}

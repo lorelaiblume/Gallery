@@ -14,6 +14,7 @@
       <button class="nav-btn active" data-category="digital">Digital Art</button>
       <button class="nav-btn" data-category="watercolor">Watercolor</button>
       <button class="nav-btn" data-category="drawings">Drawings</button>
+      <button class="nav-btn" data-category="film">Film</button>
     </nav>
   </header>
 
@@ -38,6 +39,34 @@
   <div class="modal-overlay hidden" id="qrModal">
     <div class="modal qr-only">
       <div id="qrCode"></div>
+    </div>
+  </div>
+
+  <!-- Film Player Modal -->
+  <div class="film-modal hidden" id="filmModal">
+    <div class="film-modal-inner">
+      <button class="film-close" id="filmClose">×</button>
+      <div class="film-player-wrap">
+        <video id="filmVideo" controls playsinline></video>
+        <div class="commentary-display" id="commentaryDisplay">
+          <div class="commentary-accent"></div>
+          <p class="commentary-text" id="commentaryText"></p>
+        </div>
+      </div>
+      <div class="film-modal-meta">
+        <h2 id="filmPlayerTitle"></h2>
+      </div>
+      <!-- Editor panel — edit mode only -->
+      <div class="film-editor-panel hidden" id="filmEditorPanel">
+        <div class="film-editor-title-row">
+          <input id="filmTitleEdit" class="film-editor-title-input" placeholder="Film title" />
+        </div>
+        <div class="film-editor-add">
+          <textarea id="newCommentText" placeholder="Director's note…" rows="2"></textarea>
+          <button id="addCommentAtBtn">Add note at 0:00</button>
+        </div>
+        <div class="film-editor-list" id="editorCommentList"></div>
+      </div>
     </div>
   </div>
 

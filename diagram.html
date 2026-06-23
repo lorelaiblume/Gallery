@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>How lorelaiblume.com Was Built</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Georgia', serif;
+      background: #fff;
+      color: #111;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      padding: 24px 32px 12px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    h1 { font-size: 1.1rem; letter-spacing: 0.25em; text-transform: uppercase; font-weight: normal; }
+    p.sub { font-size: 0.75rem; color: #999; margin-top: 6px; letter-spacing: 0.05em; }
+    #cy { flex: 1; width: 100%; }
+    #tooltip {
+      position: fixed;
+      background: #111;
+      color: #fff;
+      padding: 10px 16px;
+      font-size: 0.78rem;
+      letter-spacing: 0.03em;
+      line-height: 1.5;
+      max-width: 260px;
+      pointer-events: none;
+      display: none;
+      z-index: 100;
+      border-radius: 2px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>How lorelaiblume.com Was Built</h1>
+    <p class="sub">Click any box to learn what it does</p>
+  </header>
+  <div id="cy"></div>
+  <div id="tooltip"></div>
+
+  <script>
+    const descriptions = {
+      'html':       'index.html — the skeleton of the page. Defines the header, gallery grid, upload area, and nav tabs.',
+      'css':        'styles.css — makes everything look good. White background, Cormorant Garamond font, responsive layout for phone and laptop.',
+      'js':         'app.js — the brain. Handles uploads, talks to Firebase, listens for changes in real time, and manages the gallery.',
+      'firebase':   'Firebase — Google\'s cloud platform. Hosts the site, stores your art files, and keeps the database.',
+      'hosting':    'Firebase Hosting — serves your website files to anyone who visits lorelaiblume.com.',
+      'storage':    'Firebase Storage — stores the actual image and PDF files you upload. Like a cloud hard drive.',
+      'firestore':  'Firestore — a database that stores info about each piece of art: its title, category, and where the file lives in Storage.',
+      'auth':       'Firebase Auth — handles login. Only your Google account can enter edit mode.',
+      'github':     'GitHub — stores all your code. Every time you push, it automatically redeploys the site.',
+      'namecheap':  'Namecheap — where you bought lorelaiblume.com. Its DNS records point the domain at Firebase.',
+      'dns':        'DNS — like a phone book for the internet. Translates "lorelaiblume.com" into Firebase\'s server address.',
+      'browser':    'Your visitors\' browser — loads the HTML, CSS, and JS, then talks to Firebase directly to show the gallery.',
+      'you':        'You (Lorelai) — the artist and developer! You write code on your laptop and push it to GitHub.',
+      'laptop':     'Your laptop — where you write and test the code locally before pushing it live.',
+    };
+
+    const cy = cytoscape({
+      container: document.getElementById('cy'),
+      style: [
+        {
+          selector: 'node',
+          style: {
+            'background-color': '#111',
+            'label': 'data(label)',
+            'color': '#fff',
+            'font-size': '11px',
+            'font-family': 'Georgia, serif',
+            'text-valign': 'center',
+            'text-halign': 'center',
+            'width': '100px',
+            'height': '44px',
+            'shape': 'rectangle',
+            'text-wrap': 'wrap',
+            'text-max-width': '90px',
+            'letter-spacing': '1px',
+            'cursor': 'pointer',
+          }
+        },
+        {
+          selector: 'node.category',
+          style: {
+            'background-color': '#fff',
+            'color': '#111',
+            'border-width': '1px',
+            'border-color': '#111',
+            'font-size': '9px',
+            'letter-spacing': '2px',
+            'text-transform': 'uppercase',
+          }
+        },
+        {
+          selector: 'node:selected',
+          style: { 'background-color': '#555' }
+        },
+        {
+          selector: 'edge',
+          style: {
+            'width': 1,
+            'line-color': '#ccc',
+            'target-arrow-color': '#ccc',
+            'target-arrow-shape': 'triangle',
+            'curve-style': 'bezier',
+            'arrow-scale': 0.8,
+          }
+        }
+      ],
+      elements: {
+        nodes: [
+          // Row 1: You
+          { data: { id: 'you',       label: 'You\n(Lorelai)' },  position: { x: 500, y: 60 } },
+
+          // Row 2: Laptop
+          { data: { id: 'laptop',    label: 'Your Laptop' },     position: { x: 500, y: 160 } },
+
+          // Row 3: Code files
+          { data: { id: 'html',      label: 'HTML' },            position: { x: 300, y: 280 } },
+          { data: { id: 'css',       label: 'CSS' },             position: { x: 500, y: 280 } },
+          { data: { id: 'js',        label: 'JavaScript' },      position: { x: 700, y: 280 } },
+
+          // Row 4: GitHub + Namecheap
+          { data: { id: 'github',    label: 'GitHub' },          position: { x: 340, y: 400 } },
+          { data: { id: 'namecheap', label: 'Namecheap' },       position: { x: 700, y: 400 } },
+
+          // Row 5: DNS + Firebase
+          { data: { id: 'dns',       label: 'DNS' },             position: { x: 700, y: 500 } },
+          { data: { id: 'firebase',  label: 'Firebase' },        position: { x: 340, y: 500 } },
+
+          // Row 6: Firebase services
+          { data: { id: 'hosting',   label: 'Hosting' },         position: { x: 160, y: 620 } },
+          { data: { id: 'storage',   label: 'Storage' },         position: { x: 300, y: 620 } },
+          { data: { id: 'firestore', label: 'Firestore\nDB' },   position: { x: 440, y: 620 } },
+          { data: { id: 'auth',      label: 'Auth\n(Login)' },   position: { x: 580, y: 620 } },
+
+          // Row 7: Visitor
+          { data: { id: 'browser',   label: 'Visitor\'s\nBrowser' }, position: { x: 700, y: 620 } },
+        ],
+        edges: [
+          { data: { source: 'you',       target: 'laptop' } },
+          { data: { source: 'laptop',    target: 'html' } },
+          { data: { source: 'laptop',    target: 'css' } },
+          { data: { source: 'laptop',    target: 'js' } },
+          { data: { source: 'html',      target: 'github' } },
+          { data: { source: 'css',       target: 'github' } },
+          { data: { source: 'js',        target: 'github' } },
+          { data: { source: 'github',    target: 'firebase' } },
+          { data: { source: 'namecheap', target: 'dns' } },
+          { data: { source: 'dns',       target: 'hosting' } },
+          { data: { source: 'firebase',  target: 'hosting' } },
+          { data: { source: 'firebase',  target: 'storage' } },
+          { data: { source: 'firebase',  target: 'firestore' } },
+          { data: { source: 'firebase',  target: 'auth' } },
+          { data: { source: 'browser',   target: 'dns' } },
+          { data: { source: 'browser',   target: 'firestore' } },
+          { data: { source: 'browser',   target: 'storage' } },
+          { data: { source: 'browser',   target: 'auth' } },
+          { data: { source: 'js',        target: 'firestore' } },
+          { data: { source: 'js',        target: 'storage' } },
+          { data: { source: 'js',        target: 'auth' } },
+        ]
+      },
+      layout: { name: 'preset', padding: 40 }
+    });
+
+    // Tooltip on click
+    const tooltip = document.getElementById('tooltip');
+    cy.on('tap', 'node', function(evt) {
+      const id = evt.target.id();
+      const desc = descriptions[id];
+      if (desc) {
+        const pos = evt.renderedPosition;
+        const container = document.getElementById('cy').getBoundingClientRect();
+        tooltip.textContent = desc;
+        tooltip.style.display = 'block';
+        tooltip.style.left = (container.left + pos.x + 16) + 'px';
+        tooltip.style.top  = (container.top  + pos.y - 20) + 'px';
+      }
+    });
+    cy.on('tap', function(evt) {
+      if (evt.target === cy) tooltip.style.display = 'none';
+    });
+  </script>
+</body>
+</html>
