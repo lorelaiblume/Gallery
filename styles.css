@@ -633,6 +633,8 @@ body.film-playing { overflow: hidden; }
 }
 
 /* ── Editor panel ── */
+.film-editor-panel.hidden { display: none; }
+
 .film-editor-panel {
   margin-top: 32px;
   border-top: 1px solid rgba(255,255,255,0.1);
