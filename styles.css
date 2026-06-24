@@ -540,17 +540,57 @@ body.film-playing { overflow: hidden; }
   max-width: min(95vw, 1100px);
 }
 
+.film-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.film-modal-header h2 {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-weight: 300;
+  font-size: 0.82rem;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.38);
+  flex: 1;
+  min-width: 0;
+}
+
+.commentary-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.35);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.commentary-toggle.hidden { display: none; }
+
+.commentary-toggle input[type="checkbox"] {
+  accent-color: rgba(255,255,255,0.6);
+  cursor: pointer;
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
 .film-close {
   background: none;
   border: none;
   color: rgba(255,255,255,0.3);
   font-size: 1.8rem;
   cursor: pointer;
-  display: block;
-  margin-left: auto;
-  margin-bottom: 14px;
   line-height: 1;
   padding: 0;
+  flex-shrink: 0;
   transition: color 0.2s;
 }
 
@@ -614,19 +654,6 @@ body.film-playing { overflow: hidden; }
   transform: translateY(0);
 }
 
-/* ── Film title (below player) ── */
-.film-modal-meta {
-  padding: 18px 2px 0;
-}
-
-.film-modal-meta h2 {
-  font-family: 'Cormorant Garamond', Georgia, serif;
-  font-weight: 300;
-  font-size: 0.82rem;
-  letter-spacing: 0.32em;
-  text-transform: uppercase;
-  color: rgba(255,255,255,0.38);
-}
 
 /* ── Editor panel ── */
 .film-editor-panel.hidden { display: none; }

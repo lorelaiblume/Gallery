@@ -45,16 +45,20 @@
   <!-- Film Player Modal -->
   <div class="film-modal hidden" id="filmModal">
     <div class="film-modal-inner">
-      <button class="film-close" id="filmClose">×</button>
+      <div class="film-modal-header">
+        <h2 id="filmPlayerTitle"></h2>
+        <label class="commentary-toggle hidden" id="commentaryToggleLabel">
+          <input type="checkbox" id="commentaryToggle" checked />
+          Director's Commentary
+        </label>
+        <button class="film-close" id="filmClose">×</button>
+      </div>
       <div class="film-player-wrap">
         <video id="filmVideo" controls playsinline></video>
         <div class="commentary-display" id="commentaryDisplay">
           <div class="commentary-accent"></div>
           <p class="commentary-text" id="commentaryText"></p>
         </div>
-      </div>
-      <div class="film-modal-meta">
-        <h2 id="filmPlayerTitle"></h2>
       </div>
       <!-- Editor panel — edit mode only -->
       <div class="film-editor-panel hidden" id="filmEditorPanel">

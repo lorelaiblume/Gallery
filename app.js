@@ -342,6 +342,13 @@ function openFilmPlayer(film) {
   titleEl.textContent = film.title || 'Untitled';
   commentaryDisplay.classList.remove('active');
   activeCommentId = null;
+
+  // Reset commentary toggle — hidden until we confirm commentary exists
+  const toggleLabel = document.getElementById('commentaryToggleLabel');
+  const toggleCheckbox = document.getElementById('commentaryToggle');
+  toggleLabel.classList.add('hidden');
+  toggleCheckbox.checked = true;
+
   modal.classList.remove('hidden');
   document.body.classList.add('film-playing');
 
@@ -353,6 +360,13 @@ function openFilmPlayer(film) {
     .orderBy('timestamp', 'asc')
     .onSnapshot(snapshot => {
       allCommentary = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // Show toggle only if there's at least one commentary line
+      const toggleLabel = document.getElementById('commentaryToggleLabel');
+      if (allCommentary.length > 0) {
+        toggleLabel.classList.remove('hidden');
+      } else {
+        toggleLabel.classList.add('hidden');
+      }
       if (document.body.classList.contains('edit-mode')) renderEditorComments();
     });
 
@@ -399,7 +413,10 @@ function checkCommentary(video) {
   const t = video.currentTime;
   let activeComment = null;
 
-  for (let i = 0; i < allCommentary.length; i++) {
+  const toggleCheckbox = document.getElementById('commentaryToggle');
+  const commentaryEnabled = !toggleCheckbox || toggleCheckbox.checked;
+
+  if (commentaryEnabled) for (let i = 0; i < allCommentary.length; i++) {
     const c = allCommentary[i];
     const nextT = i < allCommentary.length - 1 ? allCommentary[i + 1].timestamp : Infinity;
     // Show for 3 seconds, or until the next comment — whichever comes first
