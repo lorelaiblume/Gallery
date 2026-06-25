@@ -15,6 +15,7 @@
       <button class="nav-btn" data-category="watercolor">Watercolor</button>
       <button class="nav-btn" data-category="drawings">Drawings</button>
       <button class="nav-btn" data-category="film">Film</button>
+      <button class="nav-btn" data-category="apps">Apps</button>
     </nav>
   </header>
 
@@ -39,6 +40,19 @@
   <div class="modal-overlay hidden" id="qrModal">
     <div class="modal qr-only">
       <div id="qrCode"></div>
+    </div>
+  </div>
+
+  <!-- App Modal -->
+  <div class="app-modal hidden" id="appModal">
+    <div class="app-modal-inner">
+      <div class="app-modal-header">
+        <h2 id="appModalTitle"></h2>
+        <button class="app-close" id="appClose">×</button>
+      </div>
+      <div class="app-stage-wrap" id="appStageWrap">
+        <div class="app-stage" id="appStage"></div>
+      </div>
     </div>
   </div>
 

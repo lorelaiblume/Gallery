@@ -384,6 +384,130 @@ body.edit-mode #editLink::after { content: ''; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
+   APPS SECTION
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+.gallery.apps-mode {
+  columns: unset;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 28px;
+}
+
+.app-card {
+  cursor: pointer;
+  transition: transform 0.25s ease;
+}
+
+.app-card:hover { transform: translateY(-3px); }
+
+.app-card-thumb {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: #0d0d0d;
+  border: 1px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.app-card-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.55;
+  transition: opacity 0.25s;
+}
+
+.app-card:hover .app-card-preview { opacity: 0.9; }
+
+.app-card-info { padding: 10px 0 4px; }
+
+.app-card-title {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-weight: 300;
+  font-size: 0.82rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #111;
+}
+
+/* ── App Modal ── */
+.app-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: rgba(0,0,0,0.96);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px 60px;
+  overflow-y: auto;
+}
+
+.app-modal.hidden { display: none; }
+
+body.app-playing { overflow: hidden; }
+
+.app-modal-inner {
+  width: 100%;
+  max-width: min(95vw, 1100px);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.app-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.app-modal-header h2 {
+  flex: 1;
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-weight: 300;
+  font-size: 0.82rem;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.38);
+}
+
+.app-close {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.3);
+  font-size: 1.8rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+  flex-shrink: 0;
+  transition: color 0.2s;
+}
+
+.app-close:hover { color: rgba(255,255,255,0.85); }
+
+.app-stage-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.app-stage {
+  position: relative;
+  overflow: hidden;
+  /* width/height set by JS */
+}
+
+.app-stage .frag {
+  position: absolute;
+  inset: 0;
+  will-change: transform, opacity;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
    FILM SECTION
    ═══════════════════════════════════════════════════════════════════════════════ */
 

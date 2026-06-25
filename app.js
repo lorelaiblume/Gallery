@@ -21,7 +21,7 @@ const uploadArea = document.getElementById('uploadArea');
 function enterEditMode() {
   document.body.classList.remove('view-mode');
   document.body.classList.add('edit-mode');
-  if (currentCategory !== 'film') uploadArea.classList.remove('hidden');
+  if (currentCategory !== 'film' && currentCategory !== 'apps') uploadArea.classList.remove('hidden');
   editLink.textContent = '✕';
   editLink.title = 'Exit edit mode';
   if (currentCategory === 'film') listenToFilms();
@@ -75,10 +75,18 @@ navBtns.forEach(btn => {
       if (unsubscribe) { unsubscribe(); unsubscribe = null; }
       uploadArea.classList.add('hidden');
       gallery.classList.add('film-mode');
+      gallery.classList.remove('apps-mode');
       listenToFilms();
+    } else if (currentCategory === 'apps') {
+      if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+      if (filmUnsubscribe) { filmUnsubscribe(); filmUnsubscribe = null; }
+      uploadArea.classList.add('hidden');
+      gallery.classList.remove('film-mode');
+      renderApps();
     } else {
       if (filmUnsubscribe) { filmUnsubscribe(); filmUnsubscribe = null; }
       gallery.classList.remove('film-mode');
+      gallery.classList.remove('apps-mode');
       if (document.body.classList.contains('edit-mode')) uploadArea.classList.remove('hidden');
       listenToGallery(currentCategory);
     }
@@ -623,6 +631,219 @@ function getIndexedDBItems() {
     req.onupgradeneeded = () => resolve([]);
   });
 }
+
+// ── APPS SECTION ─────────────────────────────────────────────────────────────
+
+function renderApps() {
+  gallery.innerHTML = '';
+  gallery.classList.add('apps-mode');
+  gallery.appendChild(createShapeStudyCard());
+}
+
+function createShapeStudyCard() {
+  const card = document.createElement('div');
+  card.className = 'app-card';
+
+  const thumb = document.createElement('div');
+  thumb.className = 'app-card-thumb';
+
+  const preview = document.createElement('div');
+  preview.className = 'app-card-preview';
+  preview.innerHTML = `<svg viewBox="0 0 90 60" width="90" height="60" xmlns="http://www.w3.org/2000/svg">
+    <polygon points="0,0 45,0 0,30" fill="rgba(120,210,255,0.7)"/>
+    <polygon points="45,0 90,0 90,30 45,60 0,30" fill="rgba(255,160,80,0.6)"/>
+    <polygon points="0,30 45,60 0,60" fill="rgba(255,80,140,0.7)"/>
+    <polygon points="45,60 90,30 90,60" fill="rgba(170,120,255,0.6)"/>
+    <polygon points="0,0 45,0 22,30" fill="rgba(80,220,160,0.5)"/>
+    <polygon points="45,0 68,30 22,30" fill="rgba(255,220,60,0.5)"/>
+    <polygon points="68,30 90,0 90,30" fill="rgba(255,100,100,0.5)"/>
+  </svg>`;
+  thumb.appendChild(preview);
+
+  const info = document.createElement('div');
+  info.className = 'app-card-info';
+  const title = document.createElement('h3');
+  title.className = 'app-card-title';
+  title.textContent = 'Shape Study No. 1';
+  info.appendChild(title);
+
+  card.appendChild(thumb);
+  card.appendChild(info);
+  card.addEventListener('click', openShapeStudy);
+  return card;
+}
+
+let shapeAnimStop = null;
+
+async function openShapeStudy() {
+  const modal = document.getElementById('appModal');
+  const stage = document.getElementById('appStage');
+  const titleEl = document.getElementById('appModalTitle');
+
+  titleEl.textContent = 'Shape Study No. 1';
+  modal.classList.remove('hidden');
+  document.body.classList.add('app-playing');
+
+  // Stop any previous animation
+  if (shapeAnimStop) { shapeAnimStop(); shapeAnimStop = null; }
+  stage.innerHTML = '<p style="color:rgba(255,255,255,0.2);font-family:Georgia,serif;font-size:0.8rem;letter-spacing:0.2em;text-transform:uppercase;text-align:center;padding:40px">Loading…</p>';
+  stage.style.width = '';
+  stage.style.height = '';
+
+  try {
+    const snapshot = await db.collection('pieces')
+      .where('category', '==', 'digital')
+      .orderBy('createdAt', 'asc')
+      .limit(1)
+      .get();
+
+    if (snapshot.empty) {
+      stage.innerHTML = '<p style="color:rgba(255,255,255,0.3);text-align:center;padding:40px;font-family:Georgia,serif">No digital art found.</p>';
+      return;
+    }
+
+    const piece = snapshot.docs[0].data();
+
+    // Load image to get natural dimensions (no CORS needed just to get size)
+    const img = new Image();
+    img.onload = () => {
+      if (!modal.classList.contains('hidden')) {
+        shapeAnimStop = startShapeAnimation(stage, piece.url, img.naturalWidth, img.naturalHeight);
+      }
+    };
+    img.onerror = () => {
+      stage.innerHTML = '<p style="color:rgba(255,255,255,0.3);text-align:center;padding:40px;font-family:Georgia,serif">Could not load image.</p>';
+    };
+    img.src = piece.url;
+  } catch (e) {
+    console.error('Shape Study error:', e);
+  }
+}
+
+function startShapeAnimation(stage, imgUrl, imgW, imgH) {
+  // Fit the stage to the available space
+  const wrap = document.getElementById('appStageWrap');
+  const maxW = wrap.clientWidth || window.innerWidth * 0.9;
+  const maxH = Math.max(300, window.innerHeight * 0.75 - 80);
+  const scale = Math.min(maxW / imgW, maxH / imgH, 1);
+  const W = Math.round(imgW * scale);
+  const H = Math.round(imgH * scale);
+
+  stage.style.width = W + 'px';
+  stage.style.height = H + 'px';
+  stage.innerHTML = '';
+
+  // Build triangle grid
+  const COLS = 22;
+  const ROWS = Math.ceil(COLS * H / W);
+  const cw = W / COLS;
+  const ch = H / ROWS;
+  const icx = W / 2, icy = H / 2;
+  const maxD = Math.sqrt(icx * icx + icy * icy);
+
+  const frags = [];
+  const bgSize = `${W}px ${H}px`;
+  const bgImg = `url("${imgUrl}")`;
+
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const x = c * cw, y = r * ch;
+      const pairs = [
+        { v: [[x, y], [x + cw, y], [x, y + ch]],          cx: x + cw / 3,     cy: y + ch / 3 },
+        { v: [[x + cw, y], [x + cw, y + ch], [x, y + ch]], cx: x + 2 * cw / 3, cy: y + 2 * ch / 3 }
+      ];
+
+      for (const p of pairs) {
+        const el = document.createElement('div');
+        el.className = 'frag';
+        const clipPts = p.v.map(([vx, vy]) => `${vx.toFixed(1)}px ${vy.toFixed(1)}px`).join(',');
+        el.style.cssText = `background:${bgImg} no-repeat 0 0/${bgSize};clip-path:polygon(${clipPts});`;
+        stage.appendChild(el);
+
+        const dx = p.cx - icx, dy = p.cy - icy;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const normDist = dist / maxD;
+        const angle = Math.atan2(dy, dx) + (Math.random() - 0.5) * 0.9;
+        const mag = (0.8 + Math.random() * 0.5) * Math.max(W, H) * 1.5;
+
+        frags.push({
+          el,
+          cx: p.cx, cy: p.cy,
+          sx: Math.cos(angle) * mag,
+          sy: Math.sin(angle) * mag,
+          rot: (Math.random() - 0.5) * 300,
+          normDist
+        });
+      }
+    }
+  }
+
+  // Animation loop
+  const T_IN = 1900, T_HOLD1 = 3000, T_OUT = 1300, T_HOLD2 = 700;
+  const TOTAL = T_IN + T_HOLD1 + T_OUT + T_HOLD2;
+  const ease = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  const lerp = (a, b, t) => a + (b - a) * t;
+
+  let startTs = null;
+  let animId;
+
+  function frame(ts) {
+    if (!startTs) startTs = ts;
+    const el = (ts - startTs) % TOTAL;
+
+    for (const f of frags) {
+      let prog;
+      if (el < T_IN) {
+        // Assemble — center arrives first
+        const delay = f.normDist * 0.44;
+        const t = Math.max(0, Math.min(1, (el / T_IN - delay) / (1 - delay)));
+        prog = ease(t);
+      } else if (el < T_IN + T_HOLD1) {
+        prog = 1;
+      } else if (el < T_IN + T_HOLD1 + T_OUT) {
+        // Scatter — outer leaves first
+        const delay = (1 - f.normDist) * 0.32;
+        const t = (el - T_IN - T_HOLD1) / T_OUT;
+        const tt = Math.max(0, Math.min(1, (t - delay) / (1 - delay)));
+        prog = 1 - ease(tt);
+      } else {
+        prog = 0;
+      }
+
+      const tx = lerp(f.sx, 0, prog);
+      const ty = lerp(f.sy, 0, prog);
+      const rot = lerp(f.rot, 0, prog);
+      const opacity = Math.min(1, prog < 0.05 ? prog * 20 : 1); // snap in fast, hold at 1
+
+      f.el.style.transform = `translate(${tx.toFixed(1)}px,${ty.toFixed(1)}px) rotate(${rot.toFixed(2)}deg)`;
+      f.el.style.transformOrigin = `${f.cx.toFixed(1)}px ${f.cy.toFixed(1)}px`;
+      f.el.style.opacity = opacity.toFixed(3);
+    }
+
+    animId = requestAnimationFrame(frame);
+  }
+
+  animId = requestAnimationFrame(frame);
+  return () => cancelAnimationFrame(animId);
+}
+
+function closeAppModal() {
+  const modal = document.getElementById('appModal');
+  modal.classList.add('hidden');
+  document.body.classList.remove('app-playing');
+  if (shapeAnimStop) { shapeAnimStop(); shapeAnimStop = null; }
+  document.getElementById('appStage').innerHTML = '';
+}
+
+document.getElementById('appClose').addEventListener('click', closeAppModal);
+document.getElementById('appModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('appModal')) closeAppModal();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !document.getElementById('appModal').classList.contains('hidden')) {
+    closeAppModal();
+  }
+});
 
 // ── QR Code ───────────────────────────────────────────────────────────────────
 const qrBtn = document.getElementById('qrBtn');
