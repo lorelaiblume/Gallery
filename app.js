@@ -684,147 +684,190 @@ async function openShapeStudy() {
   modal.classList.remove('hidden');
   document.body.classList.add('app-playing');
 
-  // Stop any previous animation
   if (shapeAnimStop) { shapeAnimStop(); shapeAnimStop = null; }
-  stage.innerHTML = '<p style="color:rgba(255,255,255,0.2);font-family:Georgia,serif;font-size:0.8rem;letter-spacing:0.2em;text-transform:uppercase;text-align:center;padding:40px">Loading…</p>';
+  stage.innerHTML = '<p style="color:rgba(255,255,255,0.18);font-family:Georgia,serif;font-size:0.75rem;letter-spacing:0.2em;text-transform:uppercase;text-align:center;padding:60px 0">Loading…</p>';
   stage.style.width = '';
   stage.style.height = '';
 
-  try {
-    const snapshot = await db.collection('pieces')
-      .where('category', '==', 'digital')
-      .orderBy('createdAt', 'asc')
-      .limit(1)
-      .get();
+  if (!window.THREE) {
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js');
+  }
 
-    if (snapshot.empty) {
-      stage.innerHTML = '<p style="color:rgba(255,255,255,0.3);text-align:center;padding:40px;font-family:Georgia,serif">No digital art found.</p>';
-      return;
-    }
-
-    const piece = snapshot.docs[0].data();
-
-    // Load image to get natural dimensions (no CORS needed just to get size)
-    const img = new Image();
-    img.onload = () => {
-      if (!modal.classList.contains('hidden')) {
-        shapeAnimStop = startShapeAnimation(stage, piece.url, img.naturalWidth, img.naturalHeight);
-      }
-    };
-    img.onerror = () => {
-      stage.innerHTML = '<p style="color:rgba(255,255,255,0.3);text-align:center;padding:40px;font-family:Georgia,serif">Could not load image.</p>';
-    };
-    img.src = piece.url;
-  } catch (e) {
-    console.error('Shape Study error:', e);
+  if (!modal.classList.contains('hidden')) {
+    stage.innerHTML = '';
+    shapeAnimStop = startShapeAnimation(stage);
   }
 }
 
-function startShapeAnimation(stage, imgUrl, imgW, imgH) {
-  // Fit the stage to the available space
+function startShapeAnimation(stage) {
   const wrap = document.getElementById('appStageWrap');
-  const maxW = wrap.clientWidth || window.innerWidth * 0.9;
-  const maxH = Math.max(300, window.innerHeight * 0.75 - 80);
-  const scale = Math.min(maxW / imgW, maxH / imgH, 1);
-  const W = Math.round(imgW * scale);
-  const H = Math.round(imgH * scale);
-
+  const W = Math.min(wrap.clientWidth || 800, 1100);
+  const H = Math.round(W * 2 / 3);
   stage.style.width = W + 'px';
   stage.style.height = H + 'px';
-  stage.innerHTML = '';
 
-  // Build triangle grid
-  const COLS = 22;
-  const ROWS = Math.ceil(COLS * H / W);
-  const cw = W / COLS;
-  const ch = H / ROWS;
-  const icx = W / 2, icy = H / 2;
-  const maxD = Math.sqrt(icx * icx + icy * icy);
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(W, H);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0x080808);
+  stage.appendChild(renderer.domElement);
 
-  const frags = [];
-  const bgSize = `${W}px ${H}px`;
-  const bgImg = `url("${imgUrl}")`;
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(50, W / H, 0.1, 100);
+  camera.position.z = 6.5;
 
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      const x = c * cw, y = r * ch;
-      const pairs = [
-        { v: [[x, y], [x + cw, y], [x, y + ch]],          cx: x + cw / 3,     cy: y + ch / 3 },
-        { v: [[x + cw, y], [x + cw, y + ch], [x, y + ch]], cx: x + 2 * cw / 3, cy: y + 2 * ch / 3 }
-      ];
+  // Lighting
+  scene.add(new THREE.AmbientLight(0xffffff, 0.45));
+  const dl = new THREE.DirectionalLight(0xffffff, 1.0);
+  dl.position.set(4, 6, 5);
+  scene.add(dl);
+  const dl2 = new THREE.DirectionalLight(0x8899ff, 0.35);
+  dl2.position.set(-3, -2, 3);
+  scene.add(dl2);
 
-      for (const p of pairs) {
-        const el = document.createElement('div');
-        el.className = 'frag';
-        const clipPts = p.v.map(([vx, vy]) => `${vx.toFixed(1)}px ${vy.toFixed(1)}px`).join(',');
-        el.style.cssText = `background:${bgImg} no-repeat 0 0/${bgSize};clip-path:polygon(${clipPts});`;
-        stage.appendChild(el);
-
-        const dx = p.cx - icx, dy = p.cy - icy;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        const normDist = dist / maxD;
-        const angle = Math.atan2(dy, dx) + (Math.random() - 0.5) * 0.9;
-        const mag = (0.8 + Math.random() * 0.5) * Math.max(W, H) * 1.5;
-
-        frags.push({
-          el,
-          cx: p.cx, cy: p.cy,
-          sx: Math.cos(angle) * mag,
-          sy: Math.sin(angle) * mag,
-          rot: (Math.random() - 0.5) * 300,
-          normDist
-        });
-      }
-    }
+  // Build a closed THREE.Shape from an array of [x,y] points
+  function makeShape(pts) {
+    const s = new THREE.Shape();
+    s.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) s.lineTo(pts[i][0], pts[i][1]);
+    s.closePath();
+    return s;
   }
 
-  // Animation loop
-  const T_IN = 1900, T_HOLD1 = 3000, T_OUT = 1300, T_HOLD2 = 700;
-  const TOTAL = T_IN + T_HOLD1 + T_OUT + T_HOLD2;
-  const ease = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-  const lerp = (a, b, t) => a + (b - a) * t;
+  // Build an organic blob shape
+  function blobShape(cx, cy, rx, ry, perturbs) {
+    const n = perturbs.length;
+    const pts = perturbs.map((p, i) => {
+      const a = (i / n) * Math.PI * 2;
+      return [cx + rx * (1 + p) * Math.cos(a), cy + ry * (1 + p) * Math.sin(a)];
+    });
+    return makeShape(pts);
+  }
 
-  let startTs = null;
+  // Coordinate space: image mapped to x∈[-2,2], y∈[-1.33,1.33]
+  // Colors and shapes traced from the artwork
+  const regions = [
+    {
+      color: 0x1A4FCC,
+      shape: blobShape(-1.52, 0.82, 0.40, 0.34,
+        [0.2, 0.05, 0.28, -0.12, 0.18, -0.22, 0.08, -0.18, 0.24, -0.08]),
+      z: 0.35
+    },
+    {
+      color: 0x55CCEE,
+      shape: makeShape([[-2,1.33],[-1.05,1.33],[-0.52,0.62],[-0.92,0.0],[-1.65,-0.32],[-2,-0.08]]),
+      z: -0.4
+    },
+    {
+      color: 0x88EE28,
+      shape: makeShape([[-2,0.82],[-1.18,1.33],[-0.28,1.33],[0.12,0.78],[-0.08,0.22],[-0.82,-0.02],[-1.78,0.28]]),
+      z: 0.05
+    },
+    {
+      color: 0xFF7D18,
+      shape: makeShape([[-1.75,0.42],[-0.48,0.98],[0.22,1.33],[0.88,1.08],[0.62,0.38],[0.02,-0.18],[-0.78,0.02],[-1.38,0.18]]),
+      z: -0.1
+    },
+    {
+      color: 0xE82E1E,
+      shape: makeShape([[-0.58,0.42],[0.18,0.85],[0.72,0.60],[0.52,-0.22],[0.08,-0.72],[-0.38,-0.88],[-0.78,-0.28],[-0.68,0.08]]),
+      z: 0.2
+    },
+    {
+      color: 0xFF0E88,
+      shape: makeShape([[0.22,1.33],[0.88,1.33],[0.82,-1.33],[0.08,-1.33]]),
+      z: 0.0
+    },
+    {
+      color: 0xFFB8C5,
+      shape: blobShape(-0.72, -0.52, 0.72, 0.60,
+        [0.12,-0.18,0.16,-0.08,0.22,-0.14,0.06,-0.22,0.14,-0.06,0.20,-0.16]),
+      z: 0.45
+    },
+    {
+      color: 0xFF6644,
+      shape: makeShape([[-2,-0.32],[-0.08,-0.22],[0.08,-1.33],[-2,-1.33]]),
+      z: -0.3
+    },
+    {
+      color: 0xC8B2FF,
+      shape: makeShape([[0.88,1.33],[2,1.33],[2,0.12],[1.52,-0.12],[0.92,0.12],[0.82,0.62]]),
+      z: 0.0
+    },
+    {
+      color: 0x9968EE,
+      shape: makeShape([[1.12,-0.12],[2,0.12],[2,-0.52],[1.52,-0.78],[0.88,-0.52]]),
+      z: 0.18
+    },
+    {
+      color: 0x8898EE,
+      shape: makeShape([[0.88,-0.52],[1.52,-0.78],[2,-0.52],[2,-1.18],[1.12,-1.08],[0.62,-0.88]]),
+      z: -0.12
+    },
+    {
+      color: 0xAAFF88,
+      shape: makeShape([[1.12,-1.08],[2,-1.18],[2,-1.33],[0.92,-1.33]]),
+      z: 0.28
+    },
+    {
+      color: 0xDDFF88,
+      shape: makeShape([[0.62,-1.15],[1.12,-1.08],[0.92,-1.33],[0.52,-1.33]]),
+      z: 0.08
+    },
+  ];
+
+  const extrudeOpts = { depth: 0.13, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.03, bevelSegments: 3 };
+  const meshes = [];
+
+  regions.forEach((r, i) => {
+    const geo = new THREE.ExtrudeGeometry(r.shape, extrudeOpts);
+    const mat = new THREE.MeshPhongMaterial({
+      color: r.color, side: THREE.DoubleSide, shininess: 70,
+      specular: new THREE.Color(0x333333)
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.z = r.z;
+    mesh.userData = {
+      origZ: r.z,
+      phase: i * 0.71,
+      ry: 0.18 + (i % 5) * 0.055,
+    };
+    scene.add(mesh);
+    meshes.push(mesh);
+  });
+
+  let t = 0;
   let animId;
 
-  function frame(ts) {
-    if (!startTs) startTs = ts;
-    const el = (ts - startTs) % TOTAL;
-
-    for (const f of frags) {
-      let prog;
-      if (el < T_IN) {
-        // Assemble — center arrives first
-        const delay = f.normDist * 0.44;
-        const t = Math.max(0, Math.min(1, (el / T_IN - delay) / (1 - delay)));
-        prog = ease(t);
-      } else if (el < T_IN + T_HOLD1) {
-        prog = 1;
-      } else if (el < T_IN + T_HOLD1 + T_OUT) {
-        // Scatter — outer leaves first
-        const delay = (1 - f.normDist) * 0.32;
-        const t = (el - T_IN - T_HOLD1) / T_OUT;
-        const tt = Math.max(0, Math.min(1, (t - delay) / (1 - delay)));
-        prog = 1 - ease(tt);
-      } else {
-        prog = 0;
-      }
-
-      const tx = lerp(f.sx, 0, prog);
-      const ty = lerp(f.sy, 0, prog);
-      const rot = lerp(f.rot, 0, prog);
-      const opacity = Math.min(1, prog < 0.05 ? prog * 20 : 1); // snap in fast, hold at 1
-
-      f.el.style.transform = `translate(${tx.toFixed(1)}px,${ty.toFixed(1)}px) rotate(${rot.toFixed(2)}deg)`;
-      f.el.style.transformOrigin = `${f.cx.toFixed(1)}px ${f.cy.toFixed(1)}px`;
-      f.el.style.opacity = opacity.toFixed(3);
-    }
-
-    animId = requestAnimationFrame(frame);
+  function animate() {
+    t += 0.007;
+    meshes.forEach((mesh, i) => {
+      const { origZ, phase, ry } = mesh.userData;
+      // Each shape tumbles independently — like the Three.js instancing example
+      mesh.rotation.x = Math.sin(t * 0.38 + phase) * 1.1;
+      mesh.rotation.y = t * ry + Math.sin(t * 0.22 + phase * 1.1) * 0.55;
+      mesh.rotation.z = Math.cos(t * 0.17 + phase * 0.8) * 0.35;
+      // Breathe in z so shapes weave past each other
+      mesh.position.z = origZ + Math.sin(t * 0.42 + phase) * 0.55;
+      mesh.position.x = Math.sin(t * 0.19 + phase * 1.2) * 0.07;
+      mesh.position.y = Math.cos(t * 0.15 + phase * 0.9) * 0.07;
+    });
+    // Camera drifts slowly — adds parallax depth
+    camera.position.x = Math.sin(t * 0.11) * 1.0;
+    camera.position.y = Math.cos(t * 0.09) * 0.6;
+    camera.lookAt(0, 0, 0);
+    renderer.render(scene, camera);
+    animId = requestAnimationFrame(animate);
   }
 
-  animId = requestAnimationFrame(frame);
-  return () => cancelAnimationFrame(animId);
+  animate();
+
+  return () => {
+    cancelAnimationFrame(animId);
+    meshes.forEach(m => { m.geometry.dispose(); m.material.dispose(); });
+    renderer.dispose();
+    if (stage.contains(renderer.domElement)) stage.removeChild(renderer.domElement);
+  };
 }
 
 function closeAppModal() {
