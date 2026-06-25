@@ -15,6 +15,12 @@ cd ~/Desktop/dev/lorelaiblume && git push origin main
 
 Deploy takes ~30–60 seconds after push. No build step — static files are served directly.
 
+### GitHub Actions auth
+
+The workflow uses a `FIREBASE_TOKEN` secret (not a service account key). This token was generated via `npx firebase-tools login:ci` and stored in GitHub → repo → Settings → Secrets → Actions as `FIREBASE_TOKEN`. If the deploy ever breaks with an auth error, regenerate the token the same way and update the secret.
+
+The old service account approach (`FIREBASE_SERVICE_ACCOUNT_LORELAI_BLUME_GALLERY`) was abandoned because Google's deprecated `oauth2/v4/token` endpoint stopped responding.
+
 ## Stack
 
 - Static HTML/CSS/JS (no framework, no bundler)
