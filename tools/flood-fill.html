@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Flood Fill Shape Tool</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0e0e0e; color: #bbb; font-family: Georgia, serif;
+       display: flex; flex-direction: column; height: 100vh; user-select: none; overflow: hidden; }
+
+#toolbar {
+  display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+  padding: 12px 20px; background: #080808; border-bottom: 1px solid #1a1a1a; flex-shrink: 0;
+}
+label { font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase;
+        color: #555; display: flex; align-items: center; gap: 8px; }
+input[type=range] { width: 90px; accent-color: #777; }
+input[type=file]  { display: none; }
+.btn { background: none; border: 1px solid #252525; color: #555; padding: 6px 14px;
+       font-family: inherit; font-size: 0.68rem; letter-spacing: 0.12em;
+       text-transform: uppercase; cursor: pointer; transition: all 0.15s; }
+.btn:hover { border-color: #666; color: #bbb; }
+.btn.hi { border-color: #555; color: #999; }
+#shape-count { font-size: 0.65rem; color: #2e2e2e; letter-spacing: 0.1em; margin-left: auto; }
+
+#workspace { flex: 1; display: flex; min-height: 0; }
+
+#canvas-area { flex: 1; position: relative; overflow: auto; cursor: crosshair; }
+
+#drop-zone {
+  position: absolute; inset: 20px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 10px;
+  border: 1px dashed #1e1e1e; cursor: pointer;
+}
+#drop-zone p   { font-size: 0.72rem; letter-spacing: 0.18em; text-transform: uppercase; color: #2a2a2a; }
+#drop-zone.over { border-color: #444; }
+
+#img-canvas, #ov-canvas { display: block; }
+#ov-canvas { position: absolute; top: 0; left: 0; pointer-events: none; }
+
+#svg-panel {
+  width: 360px; flex-shrink: 0; border-left: 1px solid #1a1a1a;
+  background: #080808; display: flex; flex-direction: column; overflow: hidden;
+}
+#svg-panel-hdr { padding: 12px 16px; border-bottom: 1px solid #1a1a1a; flex-shrink: 0; }
+#svg-panel-hdr h2 { font-size: 0.65rem; letter-spacing: 0.18em; text-transform: uppercase; color: #2e2e2e; font-weight: 300; }
+#svg-wrap { flex: 1; padding: 16px; overflow: auto; }
+#result-svg { width: 100%; border: 1px solid #181818; background: #050505; }
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <button class="btn hi" onclick="document.getElementById('file-in').click()">Load Image</button>
+  <input type="file" id="file-in" accept="image/*">
+
+  <label>Tolerance
+    <input type="range" id="tol" min="1" max="120" value="10">
+    <span id="tol-v">10</span>
+  </label>
+  <label>Simplify
+    <input type="range" id="simp" min="1" max="30" value="5">
+    <span id="simp-v">5</span>
+  </label>
+
+  <button class="btn" onclick="undo()">Undo</button>
+  <button class="btn" onclick="clearAll()">Clear</button>
+  <button class="btn hi" onclick="exportSVG()">Export SVG</button>
+  <span id="shape-count">load an image to start</span>
+</div>
+
+<div id="workspace">
+  <div id="canvas-area">
+    <div id="drop-zone">
+      <p>Drop image here</p>
+      <p style="color:#1e1e1e;font-size:0.6rem">or click Load Image</p>
+    </div>
+    <canvas id="img-canvas"></canvas>
+    <canvas id="ov-canvas"></canvas>
+  </div>
+
+  <div id="svg-panel">
+    <div id="svg-panel-hdr"><h2>Extracted shapes</h2></div>
+    <div id="svg-wrap">
+      <svg id="result-svg" viewBox="0 0 100 100"></svg>
+    </div>
+  </div>
+</div>
+
+<script>
+const imgC  = document.getElementById('img-canvas');
+const ovC   = document.getElementById('ov-canvas');
+const iCtx  = imgC.getContext('2d');
+const oCtx  = ovC.getContext('2d');
+const rSvg  = document.getElementById('result-svg');
+const dz    = document.getElementById('drop-zone');
+const cnt   = document.getElementById('shape-count');
+const tolEl = document.getElementById('tol');
+const smpEl = document.getElementById('simp');
+
+tolEl.addEventListener('input', () => document.getElementById('tol-v').textContent = tolEl.value);
+smpEl.addEventListener('input', () => document.getElementById('simp-v').textContent = smpEl.value);
+
+let imageData = null, W = 0, H = 0;
+let shapes = [];
+let claimed = null; // tracks which pixels are already in a shape
+
+// ── Load ──────────────────────────────────────────────────────────────────────
+document.getElementById('file-in').addEventListener('change', e => e.target.files[0] && load(e.target.files[0]));
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('over'); e.dataTransfer.files[0] && load(e.dataTransfer.files[0]); });
+
+function load(file) {
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    W = img.naturalWidth; H = img.naturalHeight;
+    imgC.width = ovC.width = W;
+    imgC.height = ovC.height = H;
+    iCtx.drawImage(img, 0, 0);
+    imageData = iCtx.getImageData(0, 0, W, H);
+
+    const area   = document.getElementById('canvas-area');
+    const maxW   = area.clientWidth  - 20;
+    const maxH   = area.clientHeight - 20;
+    const sc     = Math.min(maxW / W, maxH / H, 1);
+    imgC.style.width  = ovC.style.width  = `${W * sc}px`;
+    imgC.style.height = ovC.style.height = `${H * sc}px`;
+
+    claimed = new Uint8Array(W * H);
+    dz.style.display = 'none';
+    rSvg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    cnt.textContent = '0 shapes — click a region';
+    URL.revokeObjectURL(url);
+  };
+  img.src = url;
+}
+
+// ── Click → fill ──────────────────────────────────────────────────────────────
+imgC.addEventListener('click', e => {
+  if (!imageData) return;
+  const r   = imgC.getBoundingClientRect();
+  const x   = Math.floor((e.clientX - r.left)  * (W / r.width));
+  const y   = Math.floor((e.clientY - r.top)   * (H / r.height));
+  const tol = parseInt(tolEl.value);
+  const eps = parseFloat(smpEl.value);
+
+  const i   = (y * W + x) * 4;
+  const d   = imageData.data;
+  const col = `#${hex(d[i])}${hex(d[i+1])}${hex(d[i+2])}`;
+
+  if (claimed[y * W + x]) return; // already in a shape
+
+  const mask = fill(d, W, H, x, y, tol);
+  const poly = trace(mask, W, H);
+  if (!poly || poly.length < 6) return;
+
+  const simp = rdp(poly, eps);
+  if (simp.length < 3) return;
+
+  addShape(simp, col, mask);
+});
+
+const hex = n => n.toString(16).padStart(2, '0');
+
+// ── Flood fill ────────────────────────────────────────────────────────────────
+function fill(data, w, h, sx, sy, tol) {
+  const mask = new Uint8Array(w * h);
+  const si   = (sy * w + sx) * 4;
+  const [sr, sg, sb] = [data[si], data[si+1], data[si+2]];
+  const t2   = tol * tol * 3;
+  const stk  = [sy * w + sx];
+  mask[sy * w + sx] = 1;
+
+  while (stk.length) {
+    const pos = stk.pop();
+    const px  = pos % w, py = (pos / w) | 0;
+    for (const [nx, ny] of [[px-1,py],[px+1,py],[px,py-1],[px,py+1]]) {
+      if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
+      const np = ny * w + nx;
+      if (mask[np] || claimed[np]) continue;
+      const ni = np * 4;
+      const dr = data[ni]-sr, dg = data[ni+1]-sg, db = data[ni+2]-sb;
+      if (dr*dr + dg*dg + db*db <= t2) { mask[np] = 1; stk.push(np); }
+    }
+  }
+  return mask;
+}
+
+// ── Boundary trace ────────────────────────────────────────────────────────────
+// Builds directed edges so interior is always to the left, then follows the chain.
+function trace(mask, w, h) {
+  const nxt = new Map();
+  const key = (x, y) => `${x},${y}`;
+  const add = (x1, y1, x2, y2) => nxt.set(key(x1, y1), [x2, y2]);
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (!mask[y * w + x]) continue;
+      if (y === 0   || !mask[(y-1)*w+x])   add(x,   y,   x+1, y);      // top:    →
+      if (y === h-1 || !mask[(y+1)*w+x])   add(x+1, y+1, x,   y+1);    // bottom: ←
+      if (x === 0   || !mask[y*w+(x-1)])   add(x,   y+1, x,   y);      // left:   ↑
+      if (x === w-1 || !mask[y*w+(x+1)])   add(x+1, y,   x+1, y+1);    // right:  ↓
+    }
+  }
+
+  if (!nxt.size) return null;
+
+  // Start at topmost-leftmost edge
+  let startKey = null;
+  outer:
+  for (let y = 0; y <= h; y++)
+    for (let x = 0; x <= w; x++)
+      if (nxt.has(key(x, y))) { startKey = key(x, y); break outer; }
+
+  const [sx, sy] = startKey.split(',').map(Number);
+  const poly = [[sx, sy]];
+  let cur = nxt.get(startKey);
+
+  for (let i = 0; i < nxt.size + 1; i++) {
+    if (cur[0] === sx && cur[1] === sy) break;
+    poly.push([...cur]);
+    const k = key(cur[0], cur[1]);
+    const n = nxt.get(k);
+    if (!n) break;
+    cur = n;
+  }
+  return poly;
+}
+
+// ── Ramer-Douglas-Peucker ─────────────────────────────────────────────────────
+function rdp(pts, eps) {
+  if (pts.length <= 2) return pts;
+  const [x1,y1] = pts[0], [x2,y2] = pts[pts.length-1];
+  const dx = x2-x1, dy = y2-y1, len = Math.hypot(dx, dy);
+  let maxD = 0, maxI = 0;
+  for (let i = 1; i < pts.length-1; i++) {
+    const [px,py] = pts[i];
+    const d = len === 0 ? Math.hypot(px-x1, py-y1)
+                        : Math.abs(dy*px - dx*py + x2*y1 - y2*x1) / len;
+    if (d > maxD) { maxD = d; maxI = i; }
+  }
+  if (maxD > eps) {
+    const l = rdp(pts.slice(0, maxI+1), eps);
+    const r = rdp(pts.slice(maxI), eps);
+    return [...l.slice(0,-1), ...r];
+  }
+  return [pts[0], pts[pts.length-1]];
+}
+
+// ── Shape management ──────────────────────────────────────────────────────────
+function addShape(poly, color, mask) {
+  // Mark every filled pixel as claimed
+  if (mask) for (let i = 0; i < mask.length; i++) if (mask[i]) claimed[i] = 1;
+  shapes.push({ poly, color, mask });
+
+  const el = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+  el.setAttribute('points', poly.map(([x,y])=>`${x},${y}`).join(' '));
+  el.setAttribute('fill', color);
+  rSvg.appendChild(el);
+
+  redrawOverlay();
+  cnt.textContent = `${shapes.length} shape${shapes.length !== 1 ? 's' : ''}`;
+}
+
+function redrawOverlay() {
+  oCtx.clearRect(0, 0, W, H);
+  for (const { poly, color } of shapes) {
+    oCtx.beginPath();
+    oCtx.moveTo(poly[0][0], poly[0][1]);
+    for (let i = 1; i < poly.length; i++) oCtx.lineTo(poly[i][0], poly[i][1]);
+    oCtx.closePath();
+    oCtx.fillStyle = color + '99';
+    oCtx.fill();
+  }
+}
+
+function undo() {
+  if (!shapes.length) return;
+  const removed = shapes.pop();
+  // Un-claim the removed shape's pixels
+  if (removed.mask) for (let i = 0; i < removed.mask.length; i++) if (removed.mask[i]) claimed[i] = 0;
+  rSvg.removeChild(rSvg.lastElementChild);
+  redrawOverlay();
+  cnt.textContent = `${shapes.length} shape${shapes.length !== 1 ? 's' : ''}`;
+}
+
+function clearAll() {
+  shapes = []; rSvg.innerHTML = '';
+  if (claimed) claimed.fill(0);
+  oCtx.clearRect(0, 0, W, H);
+  cnt.textContent = '0 shapes — click a region';
+}
+
+function exportSVG() {
+  if (!shapes.length) { alert('No shapes yet!'); return; }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}">\n` +
+    shapes.map(({poly,color}) =>
+      `  <polygon points="${poly.map(([x,y])=>`${x},${y}`).join(' ')}" fill="${color}" stroke="${color}" stroke-width="1.5"/>`
+    ).join('\n') + '\n</svg>';
+  const a = document.createElement('a');
+  a.href = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  a.download = 'shapes.svg';
+  a.click();
+}
+</script>
+</body>
+</html>

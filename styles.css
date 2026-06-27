@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&family=Sigmar+One&display=swap');
 
 *, *::before, *::after {
   box-sizing: border-box;
@@ -9,7 +9,7 @@
 body {
   background: #ffffff;
   color: #111;
-  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-family: 'Karla', sans-serif;
   min-height: 100vh;
 }
 
@@ -22,12 +22,14 @@ header {
 }
 
 h1 {
-  font-family: 'Cormorant Garamond', Georgia, serif;
-  font-weight: 300;
+  font-family: 'Sigmar One', cursive;
+  font-weight: 400;
   font-size: clamp(1.8rem, 6vw, 4.5rem);
   letter-spacing: 0.35em;
   text-transform: uppercase;
   color: #111;
+  transform: scaleX(0.78);
+  display: block;
 }
 
 .subheading {
