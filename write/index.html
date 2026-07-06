@@ -13,14 +13,23 @@
       padding: 32px 24px 64px;
       color: #1a1a1a;
     }
-    h1 { font-size: 11px; font-weight: 500; color: #aaa; text-transform: uppercase; letter-spacing: .12em; margin-bottom: 24px; }
+    h1 { font-size: 11px; font-weight: 500; color: #aaa; text-transform: uppercase; letter-spacing: .12em; }
+    #topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; max-width: 720px; }
     #status { color: #888; margin-bottom: 16px; min-height: 1.4em; }
-    #copyBtn {
+
+    /* Buttons */
+    .btn, #copyBtn, #pngBtn, #modeBtn {
       font-size: 11px; letter-spacing: .04em; color: #555;
       background: #fff; border: 1px solid #ddd8d0; border-radius: 4px;
-      padding: 5px 12px; cursor: pointer; margin-bottom: 20px;
+      padding: 5px 12px; cursor: pointer;
     }
-    #copyBtn:hover { border-color: #aaa; }
+    .btn:hover, #copyBtn:hover, #pngBtn:hover, #modeBtn:hover { border-color: #aaa; }
+    #controls { display: flex; gap: 10px; margin-bottom: 32px; }
+
+    /* Mode gating — editor-only elements hidden until editor mode is on */
+    body:not(.editor-mode) .editor-only { display: none !important; }
+    body.editor-mode #modeBtn { color: #3a8a4a; border-color: #bfe0c5; background: #f4fbf5; }
+    body.editor-mode #output-canvas { cursor: pointer; }
     #input {
       display: block; width: 100%; max-width: 720px;
       height: 80px; font-size: 1rem; padding: 12px 14px;
@@ -51,11 +60,14 @@
 </head>
 <body>
 
-<h1>Lorelai's Handwriting — POC</h1>
-<div id="status">Loading font…</div>
-<button id="copyBtn" title="Copy the current calibration JSON, then paste it into write/metadata.json">Copy JSON</button>
+<div id="topbar">
+  <h1>Lorelai's Handwriting</h1>
+  <button id="modeBtn" title="Toggle editor mode">Edit</button>
+</div>
 
-<div class="debug-section" style="margin-top:0">
+<div id="status" class="editor-only">Loading font…</div>
+
+<div class="debug-section editor-only" style="margin-top:0">
   <div class="debug-label">Extracted glyphs (<span id="glyph-count">0</span>)</div>
   <div id="glyph-grid"></div>
 </div>
@@ -63,7 +75,12 @@
 <textarea id="input" placeholder="Type something…" spellcheck="false" autocomplete="off"></textarea>
 <canvas id="output-canvas"></canvas>
 
-<div class="debug-section">
+<div id="controls">
+  <button id="pngBtn" title="Copy the output as a PNG image">Copy PNG</button>
+  <button id="copyBtn" class="editor-only" title="Copy the current calibration JSON, then paste it into write/metadata.json">Copy JSON</button>
+</div>
+
+<div class="debug-section editor-only">
   <div class="debug-label">Source PDF (rendered)</div>
   <canvas id="src-thumb"></canvas>
 </div>
@@ -444,12 +461,20 @@ document.getElementById('input').addEventListener('input', e => {
   renderText(e.target.value);
 });
 
+// ── Editor mode: toggles the calibration UI on/off ──────────────────────────────
+const isEditor = () => document.body.classList.contains('editor-mode');
+document.getElementById('modeBtn').addEventListener('click', () => {
+  const on = document.body.classList.toggle('editor-mode');
+  document.getElementById('modeBtn').textContent = on ? 'Done' : 'Edit';
+  if (!on) { selectedChar = null; selectedIndex = -1; }  // clear selection on exit
+  renderText(document.getElementById('input').value);
+});
+
 // ── Baseline calibration: click a glyph, then arrow-key it up/down ──────────────
 const outCanvas = document.getElementById('output-canvas');
-outCanvas.style.cursor = 'pointer';
 
 outCanvas.addEventListener('click', e => {
-  if (!ready) return;
+  if (!ready || !isEditor()) return;
   // map click from CSS pixels to canvas pixels (canvas may be scaled by max-width)
   const rect = outCanvas.getBoundingClientRect();
   const mx = (e.clientX - rect.left) * (outCanvas.width  / rect.width);
@@ -471,7 +496,7 @@ outCanvas.addEventListener('click', e => {
 });
 
 window.addEventListener('keydown', e => {
-  if (selectedChar === null) return;
+  if (!isEditor() || selectedChar === null) return;
   const KEYS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Escape'];
   if (!KEYS.includes(e.key)) return;
   e.preventDefault();
@@ -508,6 +533,29 @@ copyBtn.addEventListener('click', async () => {
   dirty = false;
   copyBtn.textContent = 'Copied!';
   setTimeout(() => { copyBtn.textContent = 'Copy JSON'; }, 1500);
+});
+
+// ── Copy PNG: put the rendered output on the clipboard (fallback: download) ──────
+const pngBtn = document.getElementById('pngBtn');
+pngBtn.addEventListener('click', () => {
+  const canvas = document.getElementById('output-canvas');
+  canvas.toBlob(async blob => {
+    if (!blob) return;
+    let label = 'Copied!';
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+    } catch (e) {
+      // Clipboard image not supported here — download the PNG instead
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'handwriting.png';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      label = 'Downloaded';
+    }
+    pngBtn.textContent = label;
+    setTimeout(() => { pngBtn.textContent = 'Copy PNG'; }, 1500);
+  }, 'image/png');
 });
 
 init().catch(e => {
