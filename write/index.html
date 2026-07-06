@@ -47,7 +47,6 @@
     /* ── Debug ── */
     .debug-section { margin-top: 32px; }
     .debug-label { font-size: 10px; color: #bbb; text-transform: uppercase; letter-spacing: .12em; margin-bottom: 10px; }
-    #src-thumb { border: 1px solid #e0dcd4; border-radius: 3px; display: block; max-width: 360px; margin-bottom: 24px; }
     #glyph-grid { display: flex; flex-wrap: wrap; gap: 4px; max-width: 900px; }
     .glyph-cell {
       display: flex; flex-direction: column; align-items: center; gap: 2px;
@@ -78,11 +77,6 @@
 <div id="controls">
   <button id="pngBtn" title="Copy the output as a PNG image">Copy PNG</button>
   <button id="copyBtn" class="editor-only" title="Copy the current calibration JSON, then paste it into write/metadata.json">Copy JSON</button>
-</div>
-
-<div class="debug-section editor-only">
-  <div class="debug-label">Source PDF (rendered)</div>
-  <canvas id="src-thumb"></canvas>
 </div>
 
 <canvas id="src" style="display:none"></canvas>
@@ -170,13 +164,6 @@ async function init() {
   srcCanvas.height = viewport.height;
   const ctx = srcCanvas.getContext('2d');
   await page.render({ canvasContext: ctx, viewport }).promise;
-
-  // Show thumbnail
-  const thumb = document.getElementById('src-thumb');
-  const thumbW = 360;
-  const thumbH = Math.round(srcCanvas.height * thumbW / srcCanvas.width);
-  thumb.width = thumbW; thumb.height = thumbH;
-  thumb.getContext('2d').drawImage(srcCanvas, 0, 0, thumbW, thumbH);
 
   status.textContent = 'Segmenting…';
   await tick();
