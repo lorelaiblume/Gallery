@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lorelai's Handwriting</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #f0ece4;
+      font-family: system-ui, sans-serif;
+      font-size: 13px;
+      padding: 32px 24px 64px;
+      color: #1a1a1a;
+    }
+    h1 { font-size: 11px; font-weight: 500; color: #aaa; text-transform: uppercase; letter-spacing: .12em; margin-bottom: 24px; }
+    #status { color: #888; margin-bottom: 16px; min-height: 1.4em; }
+    #copyBtn {
+      font-size: 11px; letter-spacing: .04em; color: #555;
+      background: #fff; border: 1px solid #ddd8d0; border-radius: 4px;
+      padding: 5px 12px; cursor: pointer; margin-bottom: 20px;
+    }
+    #copyBtn:hover { border-color: #aaa; }
+    #input {
+      display: block; width: 100%; max-width: 720px;
+      height: 80px; font-size: 1rem; padding: 12px 14px;
+      border: 1px solid #ddd8d0; border-radius: 4px;
+      margin-bottom: 24px; resize: none; background: #fff;
+      outline: none; font-family: Georgia, serif;
+    }
+    #input:focus { border-color: #aaa; }
+    #output-canvas {
+      background: #fffef7; border: 1px solid #e0dcd4;
+      border-radius: 3px; display: block; max-width: 100%;
+      margin-bottom: 40px;
+    }
+
+    /* ── Debug ── */
+    .debug-section { margin-top: 32px; }
+    .debug-label { font-size: 10px; color: #bbb; text-transform: uppercase; letter-spacing: .12em; margin-bottom: 10px; }
+    #src-thumb { border: 1px solid #e0dcd4; border-radius: 3px; display: block; max-width: 360px; margin-bottom: 24px; }
+    #glyph-grid { display: flex; flex-wrap: wrap; gap: 4px; max-width: 900px; }
+    .glyph-cell {
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      background: #fff; border: 1px solid #e8e4dc; border-radius: 3px; padding: 4px 4px 2px;
+    }
+    .glyph-cell canvas { display: block; }
+    .glyph-label { font-size: 8px; color: #bbb; }
+    .glyph-cell.warn { border-color: #f0a0a0; background: #fff8f8; }
+  </style>
+</head>
+<body>
+
+<h1>Lorelai's Handwriting — POC</h1>
+<div id="status">Loading font…</div>
+<button id="copyBtn" title="Copy the current calibration JSON, then paste it into write/metadata.json">Copy JSON</button>
+
+<div class="debug-section" style="margin-top:0">
+  <div class="debug-label">Extracted glyphs (<span id="glyph-count">0</span>)</div>
+  <div id="glyph-grid"></div>
+</div>
+
+<textarea id="input" placeholder="Type something…" spellcheck="false" autocomplete="off"></textarea>
+<canvas id="output-canvas"></canvas>
+
+<div class="debug-section">
+  <div class="debug-label">Source PDF (rendered)</div>
+  <canvas id="src-thumb"></canvas>
+</div>
+
+<canvas id="src" style="display:none"></canvas>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// Character sequence in the PDF, row by row, left to right
+const ROWS = [
+  ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R'],
+  ['S','T','U','V','W','X','Y','Z'],
+  ['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r'],
+  ['s','t','u','v','w','x','y','z'],
+  ['1','2','3','4','5','6','7','8','9','0'],
+  ['.', ',', ';', ':', '!', '?', '(', ')', '-'],
+  ['@', '$', '%', '&', '*']
+];
+
+const glyphs = {};
+let srcCanvas = null;
+let ready = false;
+
+// ── Per-glyph metadata ──────────────────────────────────────────────────────────
+// glyphMeta[ch] = { baseline?: px (−up/+down), width?: px advance adjustment }.
+// Data lives in write/metadata.json (committed to git). Edits happen in memory;
+// use the "Copy JSON" button to grab the result and paste it back into that file.
+let glyphMeta = {};
+let dirty = false;           // true once edited but not yet copied out
+let selectedChar = null;     // which character is being calibrated
+let selectedIndex = -1;      // which drawn instance is highlighted
+let rendered = [];           // hit-test record of drawn glyphs: {ch, x, y, w, h}
+
+// Return the metadata object for a character, creating it if needed.
+function metaFor(ch) {
+  if (!glyphMeta[ch]) glyphMeta[ch] = {};
+  return glyphMeta[ch];
+}
+// Drop zero-valued fields (and empty objects) so the JSON stays tidy.
+function pruneMeta(ch) {
+  const m = glyphMeta[ch];
+  if (!m) return;
+  for (const k of Object.keys(m)) if (!m[k]) delete m[k];
+  if (Object.keys(m).length === 0) delete glyphMeta[ch];
+}
+
+// Load saved calibration from metadata.json (falls back to empty on any failure).
+// Accepts the legacy format where a value was a bare number (baseline offset).
+async function loadMeta() {
+  try {
+    const r = await fetch('metadata.json', { cache: 'no-store' });
+    if (r.ok) {
+      const raw = (await r.json()) || {};
+      glyphMeta = {};
+      for (const ch of Object.keys(raw)) {
+        const v = raw[ch];
+        glyphMeta[ch] = (typeof v === 'number') ? { baseline: v } : (v || {});
+      }
+    }
+  } catch (e) {
+    console.warn('Could not load metadata.json — starting empty.', e);
+  }
+}
+
+// Mark an edit as unsaved and update the Copy button's label.
+function markDirty() {
+  dirty = true;
+  const btn = document.getElementById('copyBtn');
+  if (btn) btn.textContent = 'Copy JSON •';
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+async function init() {
+  const status = document.getElementById('status');
+
+  const pdf = await pdfjsLib.getDocument('font.pdf').promise;
+  const page = await pdf.getPage(1);
+
+  const SCALE = 3;
+  const viewport = page.getViewport({ scale: SCALE });
+
+  srcCanvas = document.getElementById('src');
+  srcCanvas.width  = viewport.width;
+  srcCanvas.height = viewport.height;
+  const ctx = srcCanvas.getContext('2d');
+  await page.render({ canvasContext: ctx, viewport }).promise;
+
+  // Show thumbnail
+  const thumb = document.getElementById('src-thumb');
+  const thumbW = 360;
+  const thumbH = Math.round(srcCanvas.height * thumbW / srcCanvas.width);
+  thumb.width = thumbW; thumb.height = thumbH;
+  thumb.getContext('2d').drawImage(srcCanvas, 0, 0, thumbW, thumbH);
+
+  status.textContent = 'Segmenting…';
+  await tick();
+
+  const imgData = ctx.getImageData(0, 0, srcCanvas.width, srcCanvas.height);
+  segment(imgData, srcCanvas.width, srcCanvas.height);
+
+  const n = Object.keys(glyphs).length;
+  status.textContent = `Ready — ${n} / ${ROWS.flat().length} glyphs mapped`;
+  document.getElementById('glyph-count').textContent = n;
+  ready = true;
+
+  await loadMeta();   // pull saved baseline calibration from metadata.json
+  showGrid();
+  renderText(document.getElementById('input').value);
+}
+
+// ── Segmentation ──────────────────────────────────────────────────────────────
+function binarize(d, n, thresh = 160) {
+  const ink = new Uint8Array(n);
+  for (let i = 0; i < n; i++)
+    ink[i] = (d[i*4] + d[i*4+1] + d[i*4+2]) / 3 < thresh ? 1 : 0;
+  return ink;
+}
+
+// Find runs of non-zero values; minGap = minimum zero-run to count as a split
+function findBands(sums, minGap) {
+  const bands = [];
+  let inBand = false, start = 0;
+  for (let i = 0; i <= sums.length; i++) {
+    const v = i < sums.length ? sums[i] : 0;
+    if (!inBand && v > 0) { inBand = true; start = i; }
+    else if (inBand && v === 0) {
+      let gap = 0;
+      while (i + gap < sums.length && sums[i + gap] === 0) gap++;
+      if (gap >= minGap) { bands.push({ start, end: i }); inBand = false; i += gap - 1; }
+    }
+  }
+  return bands;
+}
+
+// Reconcile a list of [start,end) clusters to a known target count.
+// Too many → merge the closest-adjacent pair; too few → split the widest
+// cluster at its lowest-ink column. Immune to uneven handwriting spacing.
+function reconcile(clusters, target, colSums) {
+  clusters = clusters.map(c => c.slice());
+  while (clusters.length > target) {
+    let best = Infinity, idx = 0;
+    for (let i = 0; i < clusters.length - 1; i++) {
+      const gap = clusters[i + 1][0] - clusters[i][1];
+      if (gap < best) { best = gap; idx = i; }
+    }
+    clusters[idx] = [clusters[idx][0], clusters[idx + 1][1]];
+    clusters.splice(idx + 1, 1);
+  }
+  while (clusters.length < target) {
+    let widest = -1, idx = 0;
+    for (let i = 0; i < clusters.length; i++) {
+      const w = clusters[i][1] - clusters[i][0];
+      if (w > widest) { widest = w; idx = i; }
+    }
+    const [s, e] = clusters[idx];
+    const lo = s + Math.floor((e - s) * 0.2);
+    const hi = s + Math.floor((e - s) * 0.8);
+    let mid = Math.floor((s + e) / 2);
+    if (hi > lo) {
+      let mn = Infinity;
+      for (let x = lo; x < hi; x++) if (colSums[x] < mn) { mn = colSums[x]; mid = x; }
+    }
+    clusters[idx] = [s, mid];
+    clusters.splice(idx + 1, 0, [mid, e]);
+  }
+  return clusters;
+}
+
+function segment(imageData, W, H) {
+  const ink = binarize(imageData.data, W * H);
+
+  // Row projection — ignore bottom 8% to skip page number
+  const usableH = Math.floor(H * 0.92);
+  const rowSums = new Float32Array(usableH);
+  for (let y = 0; y < usableH; y++)
+    for (let x = 0; x < W; x++)
+      rowSums[y] += ink[y * W + x];
+
+  // Row bands: minGap=30px at 3x. Rows in PDF are well separated.
+  const rowBands = findBands(rowSums, 30);
+  console.log(`Row bands found: ${rowBands.length}`, rowBands.map(b => `y=${b.start}-${b.end}`));
+
+  for (let ri = 0; ri < rowBands.length; ri++) {
+    const chars = ROWS[ri];
+    if (!chars) continue;
+    const rb = rowBands[ri];
+
+    // ── Gap-cluster extraction, reconciled to known glyph count ────────────
+    // Column projection over the row band.
+    const colSums = new Float32Array(W);
+    for (let x = 0; x < W; x++)
+      for (let y = rb.start; y < rb.end; y++)
+        colSums[x] += ink[y * W + x];
+
+    // Raw clusters: contiguous ink columns split by a small whitespace gap.
+    let clusters = findBands(colSums, 2).map(b => [b.start, b.end]);
+    if (clusters.length === 0) { console.warn(`Row ${ri}: no ink found`); continue; }
+
+    // Force the cluster count to match this row's known glyph count.
+    clusters = reconcile(clusters, chars.length, colSums);
+
+    for (let ci = 0; ci < chars.length; ci++) {
+      const [cs, ce] = clusters[ci];
+
+      // Tight bounding box of ink within this cluster
+      let gx0 = ce, gx1 = cs, gy0 = rb.end, gy1 = rb.start;
+      for (let y = rb.start; y < rb.end; y++) {
+        for (let x = cs; x < ce; x++) {
+          if (ink[y * W + x]) {
+            if (x < gx0) gx0 = x;
+            if (x > gx1) gx1 = x;
+            if (y < gy0) gy0 = y;
+            if (y > gy1) gy1 = y;
+          }
+        }
+      }
+
+      if (gx1 >= gx0 && gy1 >= gy0) {
+        glyphs[chars[ci]] = { sx: gx0, sy: gy0, sw: gx1 - gx0 + 1, sh: gy1 - gy0 + 1 };
+      } else {
+        // Empty cluster — store its span as fallback
+        glyphs[chars[ci]] = { sx: cs, sy: rb.start, sw: ce - cs, sh: rb.end - rb.start, empty: true };
+        console.warn(`Row ${ri}, glyph ${ci} (${chars[ci]}): empty cluster`);
+      }
+    }
+  }
+}
+
+// ── Text rendering ────────────────────────────────────────────────────────────
+const CELL_W = 40;
+const CELL_H = 64;
+const LINE_H = 82;
+const PAD    = 28;
+
+function renderText(text) {
+  const out = document.getElementById('output-canvas');
+  if (!ready || !text.trim()) {
+    out.width = 400; out.height = LINE_H + PAD * 2;
+    const ctx = out.getContext('2d');
+    ctx.fillStyle = '#fffef7';
+    ctx.fillRect(0, 0, out.width, out.height);
+    return;
+  }
+
+  const lines = text.split('\n');
+  let maxCols = 0;
+  for (const l of lines) maxCols = Math.max(maxCols, l.length);
+
+  out.width  = Math.max(300, maxCols * CELL_W + PAD * 2);
+  out.height = lines.length * LINE_H + PAD * 2;
+
+  const ctx = out.getContext('2d');
+  ctx.fillStyle = '#fffef7';
+  ctx.fillRect(0, 0, out.width, out.height);
+
+  // ONE shared scale for every glyph so relative sizes are preserved
+  // (a period stays tiny, a capital stays tall). The tallest/widest glyph
+  // maps to the cell height; everything else is drawn proportionally to it.
+  let maxDim = 1;
+  for (const c of ROWS.flat()) {
+    const gg = glyphs[c];
+    if (gg) maxDim = Math.max(maxDim, gg.sw, gg.sh);
+  }
+  const S = CELL_H / maxDim;
+
+  rendered = [];   // rebuilt every render for click hit-testing
+  let cx = PAD, cy = PAD;
+  for (const line of lines) {
+    for (const ch of line) {
+      if (ch === ' ') { cx += CELL_W * 0.55; continue; }
+
+      // Per-glyph metadata: baseline offset (up/down) + width adjustment (advance)
+      const m = glyphMeta[ch] || {};
+      const off   = m.baseline || 0;
+      const cellW = CELL_W + (m.width || 0);
+
+      const g = glyphs[ch];
+      if (g && !g.empty) {
+        const dw = g.sw * S;
+        const dh = g.sh * S;
+        const dx = cx + (cellW - dw) / 2;               // centered in adjusted cell
+        const dy = cy + CELL_H - dh + off;              // baseline + saved offset
+        ctx.drawImage(srcCanvas, g.sx, g.sy, g.sw, g.sh, dx, dy, dw, dh);
+        rendered.push({ ch, x: cx, y: cy, w: cellW, h: CELL_H });
+      } else {
+        // Unknown char — placeholder box
+        ctx.fillStyle = '#eee';
+        ctx.fillRect(cx + 2, cy + 2, cellW - 4, CELL_H - 4);
+        ctx.fillStyle = '#bbb';
+        ctx.font = '16px Georgia';
+        ctx.textAlign = 'center';
+        ctx.fillText(ch, cx + cellW / 2, cy + CELL_H / 2 + 5);
+        ctx.textAlign = 'left';
+      }
+      cx += cellW;
+    }
+    cx  = PAD;
+    cy += LINE_H;
+  }
+
+  // Highlight the glyph currently being calibrated
+  if (selectedIndex >= 0 && selectedIndex < rendered.length) {
+    const r = rendered[selectedIndex];
+    ctx.strokeStyle = '#4a90d9';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(r.x + 0.5, r.y + 0.5, r.w - 1, r.h - 1);
+    // baseline reference line
+    ctx.strokeStyle = 'rgba(74,144,217,.35)';
+    ctx.beginPath();
+    ctx.moveTo(r.x, r.y + r.h);
+    ctx.lineTo(r.x + r.w, r.y + r.h);
+    ctx.stroke();
+  }
+}
+
+// Update the status line to reflect the current selection
+function updateSelectionStatus() {
+  const status = document.getElementById('status');
+  if (selectedChar === null) return;
+  const m = glyphMeta[selectedChar] || {};
+  const b = m.baseline || 0, w = m.width || 0;
+  const vert  = b < 0 ? `${-b}px up` : b > 0 ? `${b}px down` : 'on baseline';
+  const horiz = w < 0 ? `${-w}px narrower` : w > 0 ? `${w}px wider` : 'default width';
+  status.textContent = `Editing “${selectedChar}” — ${vert}, ${horiz}. ↑/↓ baseline, ←/→ width (Shift = ×5), Esc to deselect.`;
+}
+
+// ── Debug glyph grid ──────────────────────────────────────────────────────────
+function showGrid() {
+  const grid = document.getElementById('glyph-grid');
+  grid.innerHTML = '';
+  const THUMB = 40;
+
+  // ONE shared scale for every glyph so relative sizes are preserved
+  // (a period stays tiny, a capital stays tall). The tallest/widest glyph
+  // fits the cell; everything else is drawn proportionally to it.
+  let maxDim = 1;
+  for (const ch of ROWS.flat()) {
+    const g = glyphs[ch];
+    if (g) maxDim = Math.max(maxDim, g.sw, g.sh);
+  }
+  const S = (THUMB - 6) / maxDim;
+  const baseline = Math.round(THUMB * 0.80);   // common baseline near cell bottom
+
+  // Show in ROWS order so it's easy to spot issues
+  for (const row of ROWS) {
+    for (const ch of row) {
+      const g = glyphs[ch];
+      const cell = document.createElement('div');
+      cell.className = 'glyph-cell' + (g && g.empty ? ' warn' : '');
+      cell.title = ch;
+
+      const c   = document.createElement('canvas');
+      c.width = THUMB; c.height = THUMB;
+      if (g && srcCanvas) {
+        const ctx = c.getContext('2d');
+        const dw  = g.sw * S, dh = g.sh * S;
+        ctx.drawImage(srcCanvas, g.sx, g.sy, g.sw, g.sh,
+          (THUMB - dw) / 2, baseline - dh, dw, dh);   // center X, sit on baseline
+      }
+
+      const lbl = document.createElement('div');
+      lbl.className   = 'glyph-label';
+      lbl.textContent = ch;
+
+      cell.append(c, lbl);
+      grid.appendChild(cell);
+    }
+  }
+}
+
+const tick = () => new Promise(r => setTimeout(r, 0));
+
+document.getElementById('input').addEventListener('input', e => {
+  selectedChar = null; selectedIndex = -1;   // text changed → drop selection
+  renderText(e.target.value);
+});
+
+// ── Baseline calibration: click a glyph, then arrow-key it up/down ──────────────
+const outCanvas = document.getElementById('output-canvas');
+outCanvas.style.cursor = 'pointer';
+
+outCanvas.addEventListener('click', e => {
+  if (!ready) return;
+  // map click from CSS pixels to canvas pixels (canvas may be scaled by max-width)
+  const rect = outCanvas.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) * (outCanvas.width  / rect.width);
+  const my = (e.clientY - rect.top)  * (outCanvas.height / rect.height);
+
+  let hit = -1;
+  for (let i = 0; i < rendered.length; i++) {
+    const r = rendered[i];
+    if (mx >= r.x && mx <= r.x + r.w && my >= r.y && my <= r.y + r.h) { hit = i; break; }
+  }
+  if (hit >= 0) {
+    selectedIndex = hit;
+    selectedChar  = rendered[hit].ch;
+    updateSelectionStatus();
+  } else {
+    selectedChar = null; selectedIndex = -1;
+  }
+  renderText(document.getElementById('input').value);
+});
+
+window.addEventListener('keydown', e => {
+  if (selectedChar === null) return;
+  const KEYS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Escape'];
+  if (!KEYS.includes(e.key)) return;
+  e.preventDefault();
+
+  if (e.key === 'Escape') {
+    selectedChar = null; selectedIndex = -1;
+    renderText(document.getElementById('input').value);
+    return;
+  }
+  const mag = e.shiftKey ? 5 : 1;
+  const m = metaFor(selectedChar);
+  if (e.key === 'ArrowUp')    m.baseline = (m.baseline || 0) - mag;  // move up
+  if (e.key === 'ArrowDown')  m.baseline = (m.baseline || 0) + mag;  // move down
+  if (e.key === 'ArrowLeft')  m.width    = (m.width    || 0) - mag;  // narrower
+  if (e.key === 'ArrowRight') m.width    = (m.width    || 0) + mag;  // wider
+  pruneMeta(selectedChar);
+  markDirty();
+  updateSelectionStatus();
+  renderText(document.getElementById('input').value);
+});
+
+// ── Copy JSON: grab current metadata to paste into write/metadata.json ──────────
+const copyBtn = document.getElementById('copyBtn');
+copyBtn.addEventListener('click', async () => {
+  const json = JSON.stringify(glyphMeta, null, 2);
+  try {
+    await navigator.clipboard.writeText(json);
+  } catch (e) {
+    // Fallback for browsers/contexts without the async clipboard API
+    const ta = document.createElement('textarea');
+    ta.value = json; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); ta.remove();
+  }
+  dirty = false;
+  copyBtn.textContent = 'Copied!';
+  setTimeout(() => { copyBtn.textContent = 'Copy JSON'; }, 1500);
+});
+
+init().catch(e => {
+  document.getElementById('status').textContent = 'Error: ' + e.message;
+  console.error(e);
+});
+</script>
+</body>
+</html>
