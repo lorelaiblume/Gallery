@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lorelai Blume</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sigmar+One&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Playfair+Display:wght@400;700&family=Bebas+Neue&family=DM+Serif+Display:ital@0;1&family=Inter:wght@300;400&family=Josefin+Sans:wght@300;400&family=Libre+Baskerville&family=Karla:wght@300;400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1 id="siteTitle">LORELAI BLUME</h1>
+    <p class="subheading" id="siteSubheading">Art Portfolio</p>
+    <nav id="mainNav"></nav>
+  </header>
+
+  <main>
+    <div class="upload-area hidden" id="uploadArea">
+      <input type="file" id="fileInput" accept="image/*,.pdf" multiple hidden />
+      <p>Drop images or PDFs here</p>
+      <button id="browseBtn">Browse Files</button>
+      <button id="bulkImportBtn">Bulk Import from This Browser</button>
+    </div>
+    <div class="gallery" id="gallery">
+      <div class="loading" id="loadingMsg">Loading...</div>
+    </div>
+  </main>
+
+  <!-- Floating toolbar -->
+  <div class="toolbar" id="toolbar">
+    <a class="toolbar-btn" id="editLink" href="?edit" title="Edit gallery">✎</a>
+    <button class="toolbar-btn hidden" id="siteSettingsBtn" title="Site settings">⚙</button>
+    <button class="toolbar-btn" id="qrBtn" title="Share on phone">⬡</button>
+  </div>
+
+  <!-- Site Editor Panel (Google Sites-style right drawer) -->
+  <div class="site-editor" id="siteEditor">
+    <div class="se-header">
+      <span class="se-header-title">Site Settings</span>
+      <div class="se-header-right">
+        <span class="save-indicator" id="saveIndicator"></span>
+        <button class="se-close" id="seClose">×</button>
+      </div>
+    </div>
+    <div class="se-body">
+
+      <div class="se-section">
+        <div class="se-section-label">Identity</div>
+        <label class="se-label">Site Title</label>
+        <input class="se-input" id="se-title" type="text" />
+        <label class="se-label">Subheading</label>
+        <input class="se-input" id="se-subheading" type="text" />
+      </div>
+
+      <div class="se-section">
+        <div class="se-section-label">Tabs</div>
+        <div id="se-tabs-list"></div>
+        <button class="se-add-tab-btn" id="seAddTab">+ Add Tab</button>
+      </div>
+
+      <div class="se-section">
+        <div class="se-section-label">Heading Font</div>
+        <div class="se-font-grid" id="se-heading-fonts"></div>
+      </div>
+
+      <div class="se-section">
+        <div class="se-section-label">Navigation Font</div>
+        <div class="se-font-grid" id="se-nav-fonts"></div>
+      </div>
+
+      <div class="se-section">
+        <div class="se-section-label">Colors</div>
+        <div class="se-color-row">
+          <span class="se-color-label">Background</span>
+          <input type="color" class="se-color-swatch" id="se-color-bg" />
+        </div>
+        <div class="se-color-row">
+          <span class="se-color-label">Text</span>
+          <input type="color" class="se-color-swatch" id="se-color-text" />
+        </div>
+        <div class="se-color-row">
+          <span class="se-color-label">Accent / Active</span>
+          <input type="color" class="se-color-swatch" id="se-color-accent" />
+        </div>
+        <div class="se-color-row">
+          <span class="se-color-label">Subheading</span>
+          <input type="color" class="se-color-swatch" id="se-color-subheading" />
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- QR Modal -->
+  <div class="modal-overlay hidden" id="qrModal">
+    <div class="modal qr-only">
+      <div id="qrCode"></div>
+    </div>
+  </div>
+
+  <!-- App Modal -->
+  <div class="app-modal hidden" id="appModal">
+    <div class="app-modal-inner">
+      <div class="app-modal-header">
+        <h2 id="appModalTitle"></h2>
+        <button class="app-close" id="appClose">×</button>
+      </div>
+      <div class="app-stage-wrap" id="appStageWrap">
+        <div class="app-stage" id="appStage"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Film Player Modal -->
+  <div class="film-modal hidden" id="filmModal">
+    <div class="film-modal-inner">
+      <div class="film-modal-header">
+        <h2 id="filmPlayerTitle"></h2>
+        <label class="commentary-toggle hidden" id="commentaryToggleLabel">
+          <input type="checkbox" id="commentaryToggle" checked />
+          Director's Commentary
+        </label>
+        <button class="film-close" id="filmClose">×</button>
+      </div>
+      <div class="film-player-wrap">
+        <video id="filmVideo" controls playsinline></video>
+        <div class="commentary-display" id="commentaryDisplay">
+          <div class="commentary-accent"></div>
+          <p class="commentary-text" id="commentaryText"></p>
+        </div>
+      </div>
+      <div class="film-editor-panel hidden" id="filmEditorPanel">
+        <div class="film-editor-title-row">
+          <input id="filmTitleEdit" class="film-editor-title-input" placeholder="Film title" />
+        </div>
+        <div class="film-editor-add">
+          <textarea id="newCommentText" placeholder="Director's note…" rows="2"></textarea>
+          <button id="addCommentAtBtn">Add note at 0:00</button>
+        </div>
+        <div class="film-editor-list" id="editorCommentList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
