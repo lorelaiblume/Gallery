@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Draw Neon — Lorelai Blume</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="dn-header">
+    <a class="dn-home" href="/">← LORELAI BLUME</a>
+    <h1>Draw&nbsp;Neon</h1>
+    <p class="dn-sub">Draw on the left · watch it glow on the right</p>
+  </header>
+
+  <div class="dn-toolbar">
+    <label class="dn-tool">
+      <span>Color</span>
+      <input type="color" id="colorPicker" value="#ff2bd6" />
+    </label>
+    <label class="dn-tool dn-width">
+      <span>Width</span>
+      <input type="range" id="widthSlider" min="2" max="30" step="1" value="10" />
+      <span class="dn-wout" id="widthOut">10</span>
+    </label>
+    <span class="dn-divider"></span>
+    <button class="dn-btn dn-mode active" id="penBtn" data-mode="pen">Pen</button>
+    <button class="dn-btn dn-mode" id="eraserBtn" data-mode="eraser">Eraser</button>
+    <span class="dn-divider"></span>
+    <button class="dn-btn" id="undoBtn">Undo</button>
+    <button class="dn-btn" id="clearBtn">Clear</button>
+  </div>
+
+  <main class="dn-main">
+    <section class="dn-panel">
+      <div class="dn-panel-label">Draw</div>
+      <div class="dn-stage-wrap dn-draw-wrap">
+        <svg id="draw" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid meet"></svg>
+      </div>
+    </section>
+    <section class="dn-panel">
+      <div class="dn-panel-label">Neon</div>
+      <div class="dn-stage-wrap dn-neon-wrap">
+        <div class="dn-stage" id="neonStage"></div>
+        <div class="dn-placeholder" id="neonPlaceholder">Draw on the left to light it up</div>
+        <div class="dn-hint">drag to orbit · scroll to zoom</div>
+      </div>
+    </section>
+  </main>
+
+  <p class="dn-tip" id="tip">Tip: draw a circle or line and hold still at the end to snap it perfect.</p>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
