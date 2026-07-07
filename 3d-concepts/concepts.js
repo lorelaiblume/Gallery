@@ -19,21 +19,29 @@ const COL = {
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
 
-// Text label as a camera-facing sprite.
-function makeLabel(text, color = '#eef1f6') {
+// Text label as a camera-facing sprite. The canvas is sized to the text so
+// nothing clips, and the sprite is scaled to keep the text's aspect ratio.
+// `size` is the label's world height.
+function makeLabel(text, color = '#eef1f6', size = 0.42) {
+  const fontPx = 64, pad = 14;
+  const meas = document.createElement('canvas').getContext('2d');
+  meas.font = `bold ${fontPx}px Karla, sans-serif`;
+  const w = Math.ceil(meas.measureText(text).width) + pad * 2;
+  const h = fontPx + pad * 2;
+
   const c = document.createElement('canvas');
-  const s = 128;
-  c.width = c.height = s;
+  c.width = w; c.height = h;
   const ctx = c.getContext('2d');
-  ctx.font = 'bold 72px Karla, sans-serif';
+  ctx.font = `bold ${fontPx}px Karla, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = color;
-  ctx.fillText(text, s / 2, s / 2);
+  ctx.fillText(text, w / 2, h / 2);
+
   const tex = new THREE.CanvasTexture(c);
   tex.anisotropy = 4;
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
-  sprite.scale.set(0.6, 0.6, 0.6);
+  sprite.scale.set(size * (w / h), size, 1);
   return sprite;
 }
 
@@ -279,9 +287,8 @@ const slides = [
         new THREE.LineBasicMaterial({ color: 0x57e0c8, transparent: true, opacity: 0.35 })
       ));
 
-      const label = makeLabel('(2, 3, 1.5)', '#6cff9e');
-      label.position.copy(P).add(new THREE.Vector3(0, 0.45, 0));
-      label.scale.set(1.4, 1.4, 1.4);
+      const label = makeLabel('(2, 3, 1.5)', '#6cff9e', 0.5);
+      label.position.copy(P).add(new THREE.Vector3(0, 0.5, 0));
       scene.add(label);
 
       camera.position.set(5.5, 4.5, 6.5);
@@ -349,9 +356,8 @@ const slides = [
         );
         dot.position.copy(v);
         scene.add(dot);
-        const lbl = makeLabel('v' + i, '#57e0c8');
+        const lbl = makeLabel('v' + i, '#57e0c8', 0.38);
         lbl.position.copy(v).addScaledVector(v.clone().normalize(), 0.35);
-        lbl.scale.set(0.5, 0.5, 0.5);
         scene.add(lbl);
       });
 
@@ -470,9 +476,8 @@ const slides = [
       scene.add(dashedSegment(new THREE.Vector3(), A, COL.x));
       scene.add(dashedSegment(A, B, COL.z));
       scene.add(dashedSegment(B, v, COL.y));
-      const mag = makeLabel('|v| ≈ 3.9', '#57e0c8');
+      const mag = makeLabel('|v| ≈ 3.9', '#57e0c8', 0.48);
       mag.position.copy(v.clone().multiplyScalar(0.55)).add(new THREE.Vector3(0.3, 0.3, 0));
-      mag.scale.set(1.1, 1.1, 1.1);
       scene.add(mag);
 
       // Arrow 2: same vector, different starting point.
