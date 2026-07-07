@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3D Concepts — Lorelai Blume</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="dc-header">
+    <a class="dc-home" href="/">← LORELAI BLUME</a>
+    <h1>3D&nbsp;Concepts</h1>
+    <p class="dc-sub">Eight ideas, each with a live demo you can drag to rotate</p>
+  </header>
+
+  <main class="dc-main">
+    <section class="dc-slide" id="slide">
+      <div class="dc-text">
+        <div class="dc-kicker" id="slideKicker">01 / 08</div>
+        <h2 id="slideTitle">Title</h2>
+        <div class="dc-body" id="slideBody"></div>
+      </div>
+      <div class="dc-stage-wrap">
+        <div class="dc-stage" id="stage"></div>
+        <div class="dc-hint">drag to orbit · scroll to zoom</div>
+      </div>
+    </section>
+
+    <nav class="dc-nav">
+      <button class="dc-btn" id="prevBtn" aria-label="Previous">‹ Prev</button>
+      <div class="dc-dots" id="dots"></div>
+      <button class="dc-btn" id="nextBtn" aria-label="Next">Next ›</button>
+    </nav>
+  </main>
+
+  <!-- Three.js via importmap (module build + addons: OrbitControls, etc.) -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module" src="concepts.js"></script>
+</body>
+</html>
