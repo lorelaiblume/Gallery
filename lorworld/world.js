@@ -139,6 +139,8 @@ function layoutFromDocs(docs) {
     const g = buildSculpture(d.strokes, d.title || '');
     g.position.set(LOR_WORLD.x + Math.cos(a) * R, 0, LOR_WORLD.z + Math.sin(a) * R);
     g.rotation.y = -a + Math.PI / 2;    // face Lor's World center
+    g.userData.id = d.id;               // Firestore doc id (for rename/delete)
+    g.userData.title = d.title || '';
     scene.add(g);
     sculptures.push(g);
   });
@@ -171,12 +173,13 @@ const firebaseConfig = {
   appId: "1:921923872934:web:2177895d7817a267132c67",
   measurementId: "G-53XC5MSN88",
 };
+let db = null;
 try {
   firebase.initializeApp(firebaseConfig);
-  const db = firebase.firestore();
+  db = firebase.firestore();
   db.collection('neonDrawings').orderBy('createdAt', 'asc').onSnapshot((snap) => {
     const docs = [];
-    snap.forEach((doc) => { const d = doc.data(); docs.push({ title: d.title, strokes: d.strokes }); });
+    snap.forEach((doc) => { const d = doc.data(); docs.push({ id: doc.id, title: d.title, strokes: d.strokes }); });
     layoutFromDocs(docs);
   }, (err) => console.error('Firestore snapshot error:', err));
 } catch (err) {
@@ -248,6 +251,42 @@ function closeModal() {
 }
 document.getElementById('modalClose').addEventListener('click', closeModal);
 addEventListener('message', (e) => { if (e.data && e.data.type === 'neon-saved') closeModal(); });
+
+// ── Near a Lor's World design → rename / delete ──────────────────────────────
+const editPanel = document.getElementById('editPanel');
+const editName = document.getElementById('editName');
+let nearSculpt = null;
+function updateNear() {
+  if (paused) { editPanel.classList.add('hidden'); nearSculpt = null; return; }
+  let best = null, bestD = 8;
+  for (const g of sculptures) {
+    const d = Math.hypot(player.x - g.position.x, player.z - g.position.z);
+    if (d < bestD) { bestD = d; best = g; }
+  }
+  nearSculpt = best;
+  if (best) { editName.textContent = best.userData.title || '(untitled)'; editPanel.classList.remove('hidden'); }
+  else editPanel.classList.add('hidden');
+}
+function ruleError(e) {
+  console.error(e);
+  if (e && e.code === 'permission-denied') alert('Your database rules don’t allow this yet — we need to enable update & delete on neonDrawings.');
+  else alert('Something went wrong: ' + (e && e.message ? e.message : 'unknown error'));
+}
+document.getElementById('renameBtn').addEventListener('click', async () => {
+  if (!nearSculpt || !db) return;
+  const cur = nearSculpt.userData.title || '';
+  const name = (prompt('Rename this design:', cur) || '').trim();
+  if (!name || name === cur) return;
+  try { await db.collection('neonDrawings').doc(nearSculpt.userData.id).update({ title: name }); }
+  catch (e) { ruleError(e); }
+});
+document.getElementById('deleteBtn').addEventListener('click', async () => {
+  if (!nearSculpt || !db) return;
+  const name = nearSculpt.userData.title || 'this design';
+  if (!confirm(`Delete “${name}”? This can’t be undone.`)) return;
+  try { await db.collection('neonDrawings').doc(nearSculpt.userData.id).delete(); }
+  catch (e) { ruleError(e); }
+});
 
 // ── Player / tank controls ───────────────────────────────────────────────────
 const player = new THREE.Vector3(0, 0, 34);   // spawn between the two worlds
@@ -351,6 +390,7 @@ function loop(t) {
   for (const g of sculptures) if (g.userData.art) g.userData.art.rotation.y += g.userData.spin;
   for (const g of generatedGroups) if (g.userData.art) g.userData.art.rotation.y += g.userData.spin;
   updatePlayer();
+  updateNear();
   composer.render();
   if (!started) { started = true; loading.classList.add('hidden'); }
 }

@@ -106,6 +106,46 @@ body {
 }
 .lw-prompt.hidden { opacity: 0; }
 
+/* ── Near-design editor ── */
+.lw-edit {
+  position: fixed;
+  left: 50%; bottom: 84px;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid #6d2b63;
+  border-radius: 10px;
+  background: rgba(18, 6, 18, 0.78);
+  box-shadow: 0 0 22px rgba(255, 43, 214, 0.2);
+  transition: opacity .2s;
+}
+.lw-edit.hidden { opacity: 0; pointer-events: none; }
+.lw-edit-name {
+  color: #ff8fe6;
+  font-size: 0.9rem;
+  letter-spacing: 0.06em;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lw-edit-btn {
+  background: #1a0c1a;
+  color: #eef1f6;
+  border: 1px solid #6d2b63;
+  padding: 6px 13px;
+  border-radius: 7px;
+  font-family: 'Karla', sans-serif;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background .2s, color .2s;
+}
+.lw-edit-btn:hover { background: #ff2bd6; color: #120612; }
+.lw-edit-del:hover { background: #ff4d6a; color: #120612; }
+
 /* ── Draw modal ── */
 .lw-modal {
   position: fixed;
