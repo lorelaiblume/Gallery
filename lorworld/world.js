@@ -21,9 +21,13 @@ host.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x02040a);
-scene.fog = new THREE.FogExp2(0x02040a, 0.014);
+scene.fog = new THREE.FogExp2(0x02040a, 0.011);
 
 const camera = new THREE.PerspectiveCamera(65, W / H, 0.1, 1000);
+
+// Two side-by-side worlds. You spawn between them.
+const CLAUDE_WORLD = new THREE.Vector3(-44, 0, -16);
+const LOR_WORLD = new THREE.Vector3(44, 0, -16);
 
 // ── TRON floor: glowing grids ────────────────────────────────────────────────
 const grid = new THREE.GridHelper(400, 200, 0x1affff, 0x0c3a4a);
@@ -129,19 +133,19 @@ function layoutFromDocs(docs) {
   sculptures.length = 0;
   const withArt = docs.filter((d) => d.strokes && d.strokes.length);
   const N = withArt.length;
-  const R = Math.min(58, Math.max(30, 12 + N * 4));   // grow with the collection, but stay inside the outer ring
+  const R = Math.max(22, 10 + N * 3.5);   // Lor's ring grows as you add drawings
   withArt.forEach((d, i) => {
     const a = (i / N) * Math.PI * 2;
     const g = buildSculpture(d.strokes, d.title || '');
-    g.position.set(Math.cos(a) * R, 0, Math.sin(a) * R);
-    g.rotation.y = -a + Math.PI / 2;    // face the center
+    g.position.set(LOR_WORLD.x + Math.cos(a) * R, 0, LOR_WORLD.z + Math.sin(a) * R);
+    g.rotation.y = -a + Math.PI / 2;    // face Lor's World center
     scene.add(g);
     sculptures.push(g);
   });
 }
 
 // ── "Add design" portal ──────────────────────────────────────────────────────
-const PORTAL = new THREE.Vector3(0, 0, -16);
+const PORTAL = LOR_WORLD.clone();
 const portal = new THREE.Group();
 const portalRing = new THREE.Mesh(
   new THREE.RingGeometry(2.4, 2.9, 64),
@@ -204,16 +208,26 @@ const generated = [
 ];
 const generatedGroups = [];
 (function placeGenerated() {
-  const R = 78, N = generated.length;
+  const R = 26, N = generated.length;
   generated.forEach((d, i) => {
-    const a = (i / N) * Math.PI * 2 + Math.PI / N;   // offset so it interleaves with the inner ring
+    const a = (i / N) * Math.PI * 2;
     const g = buildSculpture(d.strokes, d.title);
-    g.position.set(Math.cos(a) * R, 0, Math.sin(a) * R);
-    g.rotation.y = -a + Math.PI / 2;
+    g.position.set(CLAUDE_WORLD.x + Math.cos(a) * R, 0, CLAUDE_WORLD.z + Math.sin(a) * R);
+    g.rotation.y = -a + Math.PI / 2;   // face Claude's World center
     scene.add(g);
     generatedGroups.push(g);
   });
 })();
+
+// ── Floating world titles ────────────────────────────────────────────────────
+function worldTitle(text, center, y, color) {
+  const l = makeLabel(text, color, 4.6);
+  l.material.fog = false;              // stay crisp from across the map
+  l.position.set(center.x, y, center.z);
+  scene.add(l);
+}
+worldTitle("Claude's World", CLAUDE_WORLD, 15, '#57e0c8');
+worldTitle("Lor's World", LOR_WORLD, 18, '#ff2bd6');
 
 // ── Draw portal modal + pause ────────────────────────────────────────────────
 const promptEl = document.getElementById('prompt');
@@ -236,8 +250,8 @@ document.getElementById('modalClose').addEventListener('click', closeModal);
 addEventListener('message', (e) => { if (e.data && e.data.type === 'neon-saved') closeModal(); });
 
 // ── Player / tank controls ───────────────────────────────────────────────────
-const player = new THREE.Vector3(0, 0, 0);
-let heading = 0;                 // yaw, radians; 0 = looking toward -Z
+const player = new THREE.Vector3(0, 0, 34);   // spawn between the two worlds
+let heading = 0;                 // yaw, radians; 0 = looking toward -Z (toward both worlds)
 let pitch = 0;                   // look up/down, radians
 const EYE = 3.6;
 const MOVE = 0.24, TURN = 0.033, BOUND = 150;
