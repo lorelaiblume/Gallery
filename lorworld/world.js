@@ -156,12 +156,20 @@ layoutSculptures(placeholders);
 
 // ── Player / tank controls ───────────────────────────────────────────────────
 const player = new THREE.Vector3(0, 0, 0);
-let heading = 0;                 // radians; 0 = looking toward -Z
+let heading = 0;                 // yaw, radians; 0 = looking toward -Z
+let pitch = 0;                   // look up/down, radians
 const EYE = 3.6;
 const MOVE = 0.24, TURN = 0.033, BOUND = 150;
+const PITCH_LIMIT = 1.2;
 const keys = { fwd: false, back: false, left: false, right: false };
 
+// Horizontal forward (movement follows yaw only, so W/S never fly).
 function forwardVec() { return new THREE.Vector3(Math.sin(heading), 0, -Math.cos(heading)); }
+// Full look direction including pitch (for where the camera aims).
+function lookVec() {
+  const cp = Math.cos(pitch);
+  return new THREE.Vector3(Math.sin(heading) * cp, Math.sin(pitch), -Math.cos(heading) * cp);
+}
 
 addEventListener('keydown', (e) => {
   switch (e.code) {
@@ -189,9 +197,29 @@ function updatePlayer() {
   player.x = Math.max(-BOUND, Math.min(BOUND, player.x));
   player.z = Math.max(-BOUND, Math.min(BOUND, player.z));
   camera.position.set(player.x, EYE, player.z);
-  const look = player.clone().addScaledVector(f, 4); look.y = EYE - 0.4;
-  camera.lookAt(look);
+  camera.lookAt(camera.position.clone().addScaledVector(lookVec(), 4));
 }
+
+// ── Drag to look around (mouse / trackpad / touch) ───────────────────────────
+const dom = renderer.domElement;
+dom.style.touchAction = 'none';
+dom.style.cursor = 'grab';
+let dragging = false, lastX = 0, lastY = 0;
+const LOOK_SENS = 0.0028;
+dom.addEventListener('pointerdown', (e) => {
+  dragging = true; lastX = e.clientX; lastY = e.clientY;
+  dom.setPointerCapture(e.pointerId); dom.style.cursor = 'grabbing';
+});
+dom.addEventListener('pointermove', (e) => {
+  if (!dragging) return;
+  heading += (e.clientX - lastX) * LOOK_SENS;
+  pitch -= (e.clientY - lastY) * LOOK_SENS;
+  pitch = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, pitch));
+  lastX = e.clientX; lastY = e.clientY;
+});
+function endDrag() { dragging = false; dom.style.cursor = 'grab'; }
+dom.addEventListener('pointerup', endDrag);
+dom.addEventListener('pointercancel', endDrag);
 
 // ── Resize + loop ────────────────────────────────────────────────────────────
 function resize() {
