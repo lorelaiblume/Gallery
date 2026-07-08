@@ -23,7 +23,21 @@
     <div class="lw-legend">W/S move · A/D turn</div>
   </div>
 
+  <div class="lw-prompt hidden" id="prompt">✦ Add design — walk in</div>
+
+  <div class="lw-modal hidden" id="modal">
+    <div class="lw-modal-bar">
+      <span class="lw-modal-title">Create a neon design — it drops into your world when you save</span>
+      <button class="lw-modal-close" id="modalClose">✕ Close</button>
+    </div>
+    <iframe class="lw-frame" id="drawFrame" title="Draw a neon design"></iframe>
+  </div>
+
   <div class="lw-loading" id="loading">Entering LorWorld…</div>
+
+  <!-- Firebase (Firestore) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
   <script type="importmap">
   {

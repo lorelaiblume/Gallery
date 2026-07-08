@@ -20,6 +20,10 @@ const tip = document.getElementById('tip');
 const NS = 'http://www.w3.org/2000/svg';
 const VB = 1000;
 
+// Embedded inside LorWorld's "add design" portal?
+const EMBED = new URLSearchParams(location.search).has('embed') || window.self !== window.top;
+if (EMBED) document.body.classList.add('embed');
+
 export const strokes = [];
 let live = null;                 // in-progress stroke (for live neon)
 let drawing = false, mode = 'pen', snapped = false, curPath = null, holdTimer = null;
@@ -207,7 +211,10 @@ saveBtn.addEventListener('click', async () => {
       strokes: serializeStrokes(),
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
-    setStatus(`Saved “${title}” ✦`, 'ok');
+    setStatus(EMBED ? `Added “${title}” to LorWorld ✦` : `Saved “${title}” ✦`, 'ok');
+    if (EMBED) {
+      try { window.parent.postMessage({ type: 'neon-saved', title }, '*'); } catch (e) { /* ignore */ }
+    }
   } catch (err) {
     console.error(err);
     if (err && err.code === 'permission-denied') {

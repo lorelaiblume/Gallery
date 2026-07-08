@@ -85,3 +85,67 @@ body {
   transition: opacity .6s;
 }
 .lw-loading.hidden { opacity: 0; pointer-events: none; }
+
+/* ── Proximity prompt ── */
+.lw-prompt {
+  position: fixed;
+  left: 50%; top: 42%;
+  transform: translateX(-50%);
+  z-index: 6;
+  padding: 12px 22px;
+  border: 1px solid #2b6d66;
+  border-radius: 10px;
+  background: rgba(6, 18, 20, 0.72);
+  color: #57e0c8;
+  font-size: 0.9rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  box-shadow: 0 0 22px rgba(87, 224, 200, 0.25);
+  pointer-events: none;
+  transition: opacity .25s;
+}
+.lw-prompt.hidden { opacity: 0; }
+
+/* ── Draw modal ── */
+.lw-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: rgba(2, 4, 10, 0.94);
+  display: flex;
+  flex-direction: column;
+  transition: opacity .3s;
+}
+.lw-modal.hidden { opacity: 0; pointer-events: none; }
+.lw-modal-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 20px;
+  border-bottom: 1px solid #1b2b3a;
+}
+.lw-modal-title {
+  color: #8b93a7;
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.lw-modal-close {
+  background: #0c1620;
+  color: #eef1f6;
+  border: 1px solid #2b6d66;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-family: 'Karla', sans-serif;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background .2s, color .2s;
+}
+.lw-modal-close:hover { background: #57e0c8; color: #05060a; }
+.lw-frame {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  background: #05060a;
+}

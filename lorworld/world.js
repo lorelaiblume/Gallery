@@ -114,45 +114,88 @@ function buildSculpture(strokes, title) {
   return group;
 }
 
-// ── Placeholder sample drawings (0..1000 space) — replaced by Firestore in 3b ─
-function circlePts(cx, cy, r) {
-  const p = []; for (let i = 0; i <= 60; i++) { const a = (i / 60) * Math.PI * 2; p.push({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r }); } return p;
-}
-function heartPts() {
-  const p = []; for (let i = 0; i <= 80; i++) { const t = (i / 80) * Math.PI * 2; const x = 16 * Math.sin(t) ** 3; const y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t); p.push({ x: 500 + x * 14, y: 500 - y * 14 }); } return p;
-}
-function spiralPts() {
-  const p = []; for (let i = 0; i <= 120; i++) { const t = i / 120; const a = t * Math.PI * 6; const r = 60 + t * 300; p.push({ x: 500 + Math.cos(a) * r, y: 500 + Math.sin(a) * r }); } return p;
-}
-function starPts() {
-  const p = []; for (let i = 0; i <= 10; i++) { const a = (i / 10) * Math.PI * 2 - Math.PI / 2; const r = i % 2 ? 150 : 360; p.push({ x: 500 + Math.cos(a) * r, y: 500 + Math.sin(a) * r }); } return p;
-}
-function wavePts() {
-  const p = []; for (let i = 0; i <= 100; i++) { const x = 120 + i * 7.6; const y = 500 + Math.sin(i / 100 * Math.PI * 4) * 220; p.push({ x, y }); } return p;
-}
-
-const placeholders = [
-  { title: 'ring', strokes: [{ color: '#57e0c8', width: 12, pts: circlePts(500, 500, 340) }] },
-  { title: 'heart', strokes: [{ color: '#ff2bd6', width: 12, pts: heartPts() }] },
-  { title: 'spiral', strokes: [{ color: '#ffd23f', width: 10, pts: spiralPts() }] },
-  { title: 'star', strokes: [{ color: '#4d8bff', width: 12, pts: starPts() }] },
-  { title: 'wave', strokes: [{ color: '#7bff57', width: 12, pts: wavePts() }] },
-];
-
-// Arrange sculptures in a ring around the origin.
+// ── Sculptures loaded from Firestore, arranged in circular order ─────────────
 const sculptures = [];
-function layoutSculptures(items) {
-  const R = 34;
-  items.forEach((d, i) => {
-    const a = (i / items.length) * Math.PI * 2;
-    const g = buildSculpture(d.strokes, d.title);
+function disposeGroup(g) {
+  g.traverse((o) => {
+    if (o.geometry) o.geometry.dispose();
+    if (o.material) { const m = Array.isArray(o.material) ? o.material : [o.material]; m.forEach((x) => { if (x.map) x.map.dispose(); x.dispose(); }); }
+  });
+}
+function layoutFromDocs(docs) {
+  sculptures.forEach((g) => { scene.remove(g); disposeGroup(g); });
+  sculptures.length = 0;
+  const withArt = docs.filter((d) => d.strokes && d.strokes.length);
+  const N = withArt.length;
+  const R = Math.max(30, 12 + N * 4);   // grow the ring as the collection grows
+  withArt.forEach((d, i) => {
+    const a = (i / N) * Math.PI * 2;
+    const g = buildSculpture(d.strokes, d.title || '');
     g.position.set(Math.cos(a) * R, 0, Math.sin(a) * R);
-    g.rotation.y = -a + Math.PI / 2;   // face the center
+    g.rotation.y = -a + Math.PI / 2;    // face the center
     scene.add(g);
     sculptures.push(g);
   });
 }
-layoutSculptures(placeholders);
+
+// ── "Add design" portal ──────────────────────────────────────────────────────
+const PORTAL = new THREE.Vector3(0, 0, -16);
+const portal = new THREE.Group();
+const portalRing = new THREE.Mesh(
+  new THREE.RingGeometry(2.4, 2.9, 64),
+  new THREE.MeshBasicMaterial({ color: 0xff2bd6, side: THREE.DoubleSide, transparent: true, opacity: 0.9 })
+);
+portalRing.rotation.x = -Math.PI / 2; portalRing.position.y = 0.03; portal.add(portalRing);
+const portalBeam = new THREE.Mesh(
+  new THREE.CylinderGeometry(2.4, 2.4, 12, 40, 1, true),
+  new THREE.MeshBasicMaterial({ color: 0xff2bd6, transparent: true, opacity: 0.07, side: THREE.DoubleSide })
+);
+portalBeam.position.y = 6; portal.add(portalBeam);
+const portalPlus = makeLabel('+', '#ff2bd6', 3.2); portalPlus.position.set(0, 3, 0); portal.add(portalPlus);
+const portalLabel = makeLabel('ADD DESIGN', '#ff2bd6', 1.5); portalLabel.position.set(0, 6.6, 0); portal.add(portalLabel);
+portal.position.copy(PORTAL); scene.add(portal);
+
+// ── Firebase: live-load saved drawings as sculptures ─────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyBqcTGjJDyGk71hrbqo9fQk5Iz82LMuEz0",
+  authDomain: "lorelai-blume-gallery.firebaseapp.com",
+  projectId: "lorelai-blume-gallery",
+  storageBucket: "lorelai-blume-gallery.firebasestorage.app",
+  messagingSenderId: "921923872934",
+  appId: "1:921923872934:web:2177895d7817a267132c67",
+  measurementId: "G-53XC5MSN88",
+};
+try {
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  db.collection('neonDrawings').orderBy('createdAt', 'asc').onSnapshot((snap) => {
+    const docs = [];
+    snap.forEach((doc) => { const d = doc.data(); docs.push({ title: d.title, strokes: d.strokes }); });
+    layoutFromDocs(docs);
+  }, (err) => console.error('Firestore snapshot error:', err));
+} catch (err) {
+  console.warn('Firebase init failed:', err);
+}
+
+// ── Draw portal modal + pause ────────────────────────────────────────────────
+const promptEl = document.getElementById('prompt');
+const modal = document.getElementById('modal');
+const drawFrame = document.getElementById('drawFrame');
+let paused = false, insidePortal = false;
+function keysReset() { keys.fwd = keys.back = keys.left = keys.right = false; }
+function openModal() {
+  paused = true; keysReset();
+  promptEl.classList.add('hidden');
+  drawFrame.src = '/draw-neon?embed=1';
+  modal.classList.remove('hidden');
+}
+function closeModal() {
+  modal.classList.add('hidden');
+  drawFrame.src = '';
+  paused = false;   // insidePortal stays true until you step out, so it won't reopen
+}
+document.getElementById('modalClose').addEventListener('click', closeModal);
+addEventListener('message', (e) => { if (e.data && e.data.type === 'neon-saved') closeModal(); });
 
 // ── Player / tank controls ───────────────────────────────────────────────────
 const player = new THREE.Vector3(0, 0, 0);
@@ -189,15 +232,25 @@ addEventListener('keyup', (e) => {
 });
 
 function updatePlayer() {
-  if (keys.left) heading -= TURN;
-  if (keys.right) heading += TURN;
-  const f = forwardVec();
-  if (keys.fwd) player.addScaledVector(f, MOVE);
-  if (keys.back) player.addScaledVector(f, -MOVE);
-  player.x = Math.max(-BOUND, Math.min(BOUND, player.x));
-  player.z = Math.max(-BOUND, Math.min(BOUND, player.z));
+  if (!paused) {
+    if (keys.left) heading -= TURN;
+    if (keys.right) heading += TURN;
+    const f = forwardVec();
+    if (keys.fwd) player.addScaledVector(f, MOVE);
+    if (keys.back) player.addScaledVector(f, -MOVE);
+    player.x = Math.max(-BOUND, Math.min(BOUND, player.x));
+    player.z = Math.max(-BOUND, Math.min(BOUND, player.z));
+  }
   camera.position.set(player.x, EYE, player.z);
   camera.lookAt(camera.position.clone().addScaledVector(lookVec(), 4));
+
+  // "Add design" portal proximity → prompt, then enter to open the drawing tool.
+  const dist = Math.hypot(player.x - PORTAL.x, player.z - PORTAL.z);
+  if (!paused) {
+    promptEl.classList.toggle('hidden', dist >= 8);
+    if (dist < 3 && !insidePortal) { insidePortal = true; openModal(); }
+    if (dist > 5) insidePortal = false;
+  }
 }
 
 // ── Drag to look around (mouse / trackpad / touch) ───────────────────────────
@@ -211,7 +264,7 @@ dom.addEventListener('pointerdown', (e) => {
   dom.setPointerCapture(e.pointerId); dom.style.cursor = 'grabbing';
 });
 dom.addEventListener('pointermove', (e) => {
-  if (!dragging) return;
+  if (!dragging || paused) return;
   heading += (e.clientX - lastX) * LOOK_SENS;
   pitch -= (e.clientY - lastY) * LOOK_SENS;
   pitch = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, pitch));
@@ -233,9 +286,16 @@ addEventListener('resize', resize);
 resize();
 updatePlayer();
 
+addEventListener('keydown', (e) => {
+  if (e.code === 'Escape' && !modal.classList.contains('hidden')) closeModal();
+});
+
 let started = false;
-function loop() {
+function loop(t) {
   requestAnimationFrame(loop);
+  const tt = (t || 0) * 0.001;
+  portalRing.material.opacity = 0.55 + 0.35 * Math.sin(tt * 2.5);
+  portalRing.scale.setScalar(1 + 0.05 * Math.sin(tt * 2.5));
   updatePlayer();
   composer.render();
   if (!started) { started = true; loading.classList.add('hidden'); }
