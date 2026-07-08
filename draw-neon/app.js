@@ -13,6 +13,8 @@ const penBtn = document.getElementById('penBtn');
 const eraserBtn = document.getElementById('eraserBtn');
 const undoBtn = document.getElementById('undoBtn');
 const clearBtn = document.getElementById('clearBtn');
+const saveBtn = document.getElementById('saveBtn');
+const statusEl = document.getElementById('status');
 const placeholder = document.getElementById('neonPlaceholder');
 const tip = document.getElementById('tip');
 const NS = 'http://www.w3.org/2000/svg';
@@ -158,6 +160,65 @@ undoBtn.addEventListener('click', () => { strokes.pop(); render(); });
 clearBtn.addEventListener('click', () => { strokes.length = 0; render(); });
 
 render();
+
+// ── Firebase / save to Firestore ─────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyBqcTGjJDyGk71hrbqo9fQk5Iz82LMuEz0",
+  authDomain: "lorelai-blume-gallery.firebaseapp.com",
+  projectId: "lorelai-blume-gallery",
+  storageBucket: "lorelai-blume-gallery.firebasestorage.app",
+  messagingSenderId: "921923872934",
+  appId: "1:921923872934:web:2177895d7817a267132c67",
+  measurementId: "G-53XC5MSN88",
+};
+let db = null;
+try {
+  firebase.initializeApp(firebaseConfig);
+  db = firebase.firestore();
+} catch (err) {
+  console.warn('Firebase init failed:', err);
+}
+
+function setStatus(msg, kind = '') {
+  statusEl.textContent = msg;
+  statusEl.className = 'dn-status' + (kind ? ' ' + kind : '');
+}
+
+// Compact, Firestore-safe copy of the strokes (rounded ints keep docs small).
+function serializeStrokes() {
+  return strokes.map((s) => ({
+    color: s.color,
+    width: s.width,
+    pts: s.pts.map((p) => ({ x: Math.round(p.x), y: Math.round(p.y) })),
+  }));
+}
+
+saveBtn.addEventListener('click', async () => {
+  if (!strokes.length) { setStatus('Draw something first ✏️', 'err'); return; }
+  if (!db) { setStatus('Database unavailable — try again on the live site.', 'err'); return; }
+  const title = (prompt('Name this neon drawing:', '') || '').trim();
+  if (!title) { setStatus('Save cancelled.', ''); return; }
+
+  setStatus('Saving…', '');
+  saveBtn.disabled = true;
+  try {
+    await db.collection('neonDrawings').add({
+      title,
+      strokes: serializeStrokes(),
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    setStatus(`Saved “${title}” ✦`, 'ok');
+  } catch (err) {
+    console.error(err);
+    if (err && err.code === 'permission-denied') {
+      setStatus('Save blocked by database rules — we need to allow writes (I’ll walk you through it).', 'err');
+    } else {
+      setStatus('Save failed: ' + (err && err.message ? err.message : 'unknown error'), 'err');
+    }
+  } finally {
+    saveBtn.disabled = false;
+  }
+});
 
 // ── Live neon (step 1b) — kept in a separate module so drawing works even if
 // the Three.js CDN is unavailable. ──────────────────────────────────────────

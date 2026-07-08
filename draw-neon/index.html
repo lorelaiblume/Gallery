@@ -29,7 +29,10 @@
     <span class="dn-divider"></span>
     <button class="dn-btn" id="undoBtn">Undo</button>
     <button class="dn-btn" id="clearBtn">Clear</button>
+    <span class="dn-divider"></span>
+    <button class="dn-btn dn-save" id="saveBtn">Save ✦</button>
   </div>
+  <div class="dn-status" id="status"></div>
 
   <main class="dn-main">
     <section class="dn-panel">
@@ -49,6 +52,10 @@
   </main>
 
   <p class="dn-tip" id="tip">Tip: draw a circle or line and hold still at the end to snap it perfect.</p>
+
+  <!-- Firebase (Firestore) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
   <script type="importmap">
   {

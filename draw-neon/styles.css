@@ -99,6 +99,20 @@ body {
 }
 .dn-btn:hover { border-color: var(--accent); color: var(--accent); }
 .dn-btn.active { background: var(--accent); color: #05060a; border-color: var(--accent); }
+.dn-save { border-color: var(--accent); color: var(--accent); }
+.dn-save:hover { background: var(--accent); color: #05060a; }
+
+.dn-status {
+  text-align: center;
+  min-height: 20px;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  padding: 6px 20px 0;
+  transition: color .2s;
+}
+.dn-status.ok { color: var(--accent); }
+.dn-status.err { color: #ff6b8a; }
 
 /* ── Main / panels ── */
 .dn-main {
