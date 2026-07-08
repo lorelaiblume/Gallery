@@ -127,7 +127,7 @@ function layoutFromDocs(docs) {
   sculptures.length = 0;
   const withArt = docs.filter((d) => d.strokes && d.strokes.length);
   const N = withArt.length;
-  const R = Math.max(30, 12 + N * 4);   // grow the ring as the collection grows
+  const R = Math.min(58, Math.max(30, 12 + N * 4));   // grow with the collection, but stay inside the outer ring
   withArt.forEach((d, i) => {
     const a = (i / N) * Math.PI * 2;
     const g = buildSculpture(d.strokes, d.title || '');
@@ -176,6 +176,40 @@ try {
 } catch (err) {
   console.warn('Firebase init failed:', err);
 }
+
+// ── Original generated sculptures — their own outer ring ─────────────────────
+function circlePts(cx, cy, r) {
+  const p = []; for (let i = 0; i <= 60; i++) { const a = (i / 60) * Math.PI * 2; p.push({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r }); } return p;
+}
+function heartPts() {
+  const p = []; for (let i = 0; i <= 80; i++) { const t = (i / 80) * Math.PI * 2; const x = 16 * Math.sin(t) ** 3; const y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t); p.push({ x: 500 + x * 14, y: 500 - y * 14 }); } return p;
+}
+function spiralPts() {
+  const p = []; for (let i = 0; i <= 120; i++) { const t = i / 120; const a = t * Math.PI * 6; const r = 60 + t * 300; p.push({ x: 500 + Math.cos(a) * r, y: 500 + Math.sin(a) * r }); } return p;
+}
+function starPts() {
+  const p = []; for (let i = 0; i <= 10; i++) { const a = (i / 10) * Math.PI * 2 - Math.PI / 2; const r = i % 2 ? 150 : 360; p.push({ x: 500 + Math.cos(a) * r, y: 500 + Math.sin(a) * r }); } return p;
+}
+function wavePts() {
+  const p = []; for (let i = 0; i <= 100; i++) { const x = 120 + i * 7.6; const y = 500 + Math.sin(i / 100 * Math.PI * 4) * 220; p.push({ x, y }); } return p;
+}
+const generated = [
+  { title: 'ring', strokes: [{ color: '#57e0c8', width: 12, pts: circlePts(500, 500, 340) }] },
+  { title: 'heart', strokes: [{ color: '#ff2bd6', width: 12, pts: heartPts() }] },
+  { title: 'spiral', strokes: [{ color: '#ffd23f', width: 10, pts: spiralPts() }] },
+  { title: 'star', strokes: [{ color: '#4d8bff', width: 12, pts: starPts() }] },
+  { title: 'wave', strokes: [{ color: '#7bff57', width: 12, pts: wavePts() }] },
+];
+(function placeGenerated() {
+  const R = 78, N = generated.length;
+  generated.forEach((d, i) => {
+    const a = (i / N) * Math.PI * 2 + Math.PI / N;   // offset so it interleaves with the inner ring
+    const g = buildSculpture(d.strokes, d.title);
+    g.position.set(Math.cos(a) * R, 0, Math.sin(a) * R);
+    g.rotation.y = -a + Math.PI / 2;
+    scene.add(g);
+  });
+})();
 
 // ── Draw portal modal + pause ────────────────────────────────────────────────
 const promptEl = document.getElementById('prompt');
