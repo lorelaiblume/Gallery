@@ -508,14 +508,16 @@ const slides = [
       const { scene, camera, controls } = stage;
       scene.add(new THREE.AmbientLight(0xffffff, 0.9));
 
-      // A tilted flat patch.
+      // A tilted flat patch. Edge order is chosen so e₁ × e₂ points "up" (+Y),
+      // so the normal reads naturally without fighting the orbit limits.
       const c0 = new THREE.Vector3(0, 0, 0);
-      const e1 = new THREE.Vector3(2.4, 0.4, 0.6);
-      const e2 = new THREE.Vector3(0.3, 0.5, 2.4);
-      const normal = new THREE.Vector3().crossVectors(e1, e2).normalize().multiplyScalar(2);
+      const e1 = new THREE.Vector3(0.3, 0.5, 2.4);
+      const e2 = new THREE.Vector3(2.4, 0.4, 0.6);
+      const normal = new THREE.Vector3().crossVectors(e1, e2).normalize().multiplyScalar(2.2);
 
       const p0 = c0, p1 = c0.clone().add(e1), p3 = c0.clone().add(e2);
       const p2 = c0.clone().add(e1).add(e2);
+      const center = e1.clone().add(e2).multiplyScalar(0.5); // polygon centroid
       const quad = new THREE.BufferGeometry();
       quad.setFromPoints([p0, p1, p2, p0, p2, p3]);
       quad.computeVertexNormals();
@@ -527,17 +529,26 @@ const slides = [
         new THREE.LineBasicMaterial({ color: 0x9fb4d8 })
       ));
 
-      // Edge vectors + normal at the corner.
+      // Edge vectors at the corner (the inputs to the cross product).
       scene.add(makeArrow(c0, e1, e1.length(), COL.x));
       scene.add(makeArrow(c0, e2, e2.length(), COL.z));
-      scene.add(makeArrow(c0, normal, normal.length(), COL.accent, 0.35, 0.045));
+
+      // Normal coming out of the CENTER of the polygon, pointing up.
+      const nDot = new THREE.Mesh(
+        new THREE.SphereGeometry(0.08, 16, 16),
+        new THREE.MeshBasicMaterial({ color: COL.accent })
+      );
+      nDot.position.copy(center);
+      scene.add(nDot);
+      scene.add(dashedSegment(center, center.clone().add(normal), COL.accent));
+      scene.add(makeArrow(center, normal, normal.length(), COL.accent, 0.32, 0.04));
 
       const nl = makeLabel('n = e₁ × e₂', '#57e0c8');
-      nl.position.copy(c0).add(normal).add(new THREE.Vector3(0, 0.35, 0));
+      nl.position.copy(center).add(normal).add(new THREE.Vector3(0, 0.4, 0));
       scene.add(nl);
 
-      camera.position.set(5, 4, 6);
-      controls.target.set(1.2, 0.6, 1.2);
+      camera.position.set(5.5, 3.5, 6);
+      controls.target.copy(center);
       controls.update();
     },
   },
