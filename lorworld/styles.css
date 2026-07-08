@@ -1,0 +1,87 @@
+@import url('https://fonts.googleapis.com/css2?family=Sigmar+One&family=Karla:wght@300;400;500&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { height: 100%; }
+body {
+  background: #02040a;
+  color: #eef1f6;
+  font-family: 'Karla', sans-serif;
+  overflow: hidden;
+}
+
+#world { position: fixed; inset: 0; }
+#world canvas { display: block; }
+
+.lw-home {
+  position: fixed;
+  left: 20px; top: 18px;
+  color: #7c8296;
+  text-decoration: none;
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  z-index: 5;
+  transition: color .2s;
+}
+.lw-home:hover { color: #57e0c8; }
+
+.lw-title {
+  position: fixed;
+  top: 14px; left: 50%;
+  transform: translateX(-50%) scaleX(0.82);
+  font-family: 'Sigmar One', cursive;
+  font-weight: 400;
+  font-size: clamp(1.3rem, 3vw, 2rem);
+  letter-spacing: 0.14em;
+  color: #eef1f6;
+  z-index: 5;
+  pointer-events: none;
+  text-shadow: 0 0 18px rgba(87, 224, 200, 0.5);
+}
+
+.lw-controls {
+  position: fixed;
+  left: 50%; bottom: 22px;
+  transform: translateX(-50%);
+  z-index: 5;
+  text-align: center;
+  pointer-events: none;
+}
+.lw-keys { display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 8px; }
+.lw-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px; height: 30px;
+  border: 1px solid #2b6d66;
+  border-radius: 6px;
+  color: #57e0c8;
+  font-size: 0.8rem;
+  font-weight: 500;
+  background: rgba(8, 20, 22, 0.6);
+  box-shadow: 0 0 12px rgba(87, 224, 200, 0.15);
+}
+.lw-or { color: #7c8296; font-size: 0.72rem; letter-spacing: 0.12em; margin-left: 8px; text-transform: uppercase; }
+.lw-legend {
+  color: #7c8296;
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.lw-loading {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #02040a;
+  color: #57e0c8;
+  font-size: 0.9rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  z-index: 10;
+  transition: opacity .6s;
+}
+.lw-loading.hidden { opacity: 0; pointer-events: none; }

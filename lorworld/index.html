@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LorWorld — Lorelai Blume</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="world"></div>
+
+  <a class="lw-home" href="/">← LORELAI BLUME</a>
+  <h1 class="lw-title">LorWorld</h1>
+
+  <div class="lw-controls" id="controls">
+    <div class="lw-keys">
+      <span class="lw-key">W</span>
+      <span class="lw-key">A</span>
+      <span class="lw-key">S</span>
+      <span class="lw-key">D</span>
+      <span class="lw-or">or arrows</span>
+    </div>
+    <div class="lw-legend">W/S move · A/D turn</div>
+  </div>
+
+  <div class="lw-loading" id="loading">Entering LorWorld…</div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module" src="world.js"></script>
+</body>
+</html>
