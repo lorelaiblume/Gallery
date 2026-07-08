@@ -111,6 +111,8 @@ function buildSculpture(strokes, title) {
     lbl.position.set(0, 11, 0);
     group.add(lbl);
   }
+  group.userData.art = art;                          // the neon part that spins
+  group.userData.spin = 0.0025 + Math.random() * 0.0035;
   return group;
 }
 
@@ -200,6 +202,7 @@ const generated = [
   { title: 'star', strokes: [{ color: '#4d8bff', width: 12, pts: starPts() }] },
   { title: 'wave', strokes: [{ color: '#7bff57', width: 12, pts: wavePts() }] },
 ];
+const generatedGroups = [];
 (function placeGenerated() {
   const R = 78, N = generated.length;
   generated.forEach((d, i) => {
@@ -208,6 +211,7 @@ const generated = [
     g.position.set(Math.cos(a) * R, 0, Math.sin(a) * R);
     g.rotation.y = -a + Math.PI / 2;
     scene.add(g);
+    generatedGroups.push(g);
   });
 })();
 
@@ -330,6 +334,8 @@ function loop(t) {
   const tt = (t || 0) * 0.001;
   portalRing.material.opacity = 0.55 + 0.35 * Math.sin(tt * 2.5);
   portalRing.scale.setScalar(1 + 0.05 * Math.sin(tt * 2.5));
+  for (const g of sculptures) if (g.userData.art) g.userData.art.rotation.y += g.userData.spin;
+  for (const g of generatedGroups) if (g.userData.art) g.userData.art.rotation.y += g.userData.spin;
   updatePlayer();
   composer.render();
   if (!started) { started = true; loading.classList.add('hidden'); }
