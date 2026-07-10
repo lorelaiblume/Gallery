@@ -169,6 +169,110 @@ function marbleTexture() {
   return tex;
 }
 
+// A text sprite whose text can be rewritten each frame (for live readouts).
+// Returns a Sprite with an added .setText(str) method.
+function makeDynamicLabel(color = '#eef1f6', size = 0.5) {
+  const fontPx = 64, pad = 14, W = 512, H = fontPx + pad * 2;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const ctx = c.getContext('2d');
+  const tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = 4;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+  sprite.scale.set(size * (W / H), size, 1);
+  sprite.setText = (text) => {
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = `bold ${fontPx}px Karla, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = color;
+    ctx.fillText(text, W / 2, H / 2);
+    tex.needsUpdate = true;
+  };
+  return sprite;
+}
+
+// Rounded-rectangle path helper for canvas drawing.
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+// A billboard-ish "file card": a flat panel textured with a filename and a few
+// lines of body text, framed in an accent color. `lines` is an array of
+// { text, color?, mono? }. Returns a Mesh (world width ~= wWorld).
+function makeFileCard(lines, accent = '#57e0c8', wWorld = 2.0) {
+  const CW = 400, LH = 54, padY = 30, padX = 28;
+  const CH = padY * 2 + lines.length * LH;
+  const c = document.createElement('canvas');
+  c.width = CW; c.height = CH;
+  const ctx = c.getContext('2d');
+
+  ctx.fillStyle = '#10151f';
+  roundRect(ctx, 0, 0, CW, CH, 20); ctx.fill();
+  ctx.lineWidth = 5; ctx.strokeStyle = accent;
+  roundRect(ctx, 3, 3, CW - 6, CH - 6, 18); ctx.stroke();
+
+  lines.forEach((ln, i) => {
+    ctx.font = ln.mono ? '30px monospace' : `${i === 0 ? 'bold ' : ''}32px Karla, sans-serif`;
+    ctx.fillStyle = ln.color || '#eef1f6';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(ln.text, padX, padY + LH * i + LH / 2);
+  });
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = 4;
+  const hWorld = wWorld * CH / CW;
+  return new THREE.Mesh(
+    new THREE.PlaneGeometry(wWorld, hWorld),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide })
+  );
+}
+
+// A live "raw bytes" panel: a grid of 0/1 that reshuffles a few times a second,
+// with a scatter of highlighted bits. Returns { mesh, tick(t) }.
+function makeBinaryPanel(wWorld = 4.4) {
+  const CW = 660, CH = 380, cols = 30, rows = 16;
+  const c = document.createElement('canvas');
+  c.width = CW; c.height = CH;
+  const ctx = c.getContext('2d');
+  const tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = 4;
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(wWorld, wWorld * CH / CW),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide })
+  );
+  const cw = CW / cols, ch = CH / rows;
+  let last = -1;
+  function redraw() {
+    ctx.fillStyle = '#0a0f18';
+    ctx.fillRect(0, 0, CW, CH);
+    ctx.font = '20px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (let r = 0; r < rows; r++) {
+      for (let col = 0; col < cols; col++) {
+        const bit = Math.random() < 0.5 ? '0' : '1';
+        const hot = Math.random() < 0.10;
+        ctx.fillStyle = hot ? '#57e0c8' : (bit === '1' ? '#43597f' : '#1d2736');
+        ctx.fillText(bit, col * cw + cw / 2, r * ch + ch / 2);
+      }
+    }
+    tex.needsUpdate = true;
+  }
+  redraw();
+  return {
+    mesh,
+    tick(t) { const s = Math.floor(t * 4); if (s !== last) { last = s; redraw(); } },
+  };
+}
+
 // ── Stage: one live renderer/scene/camera/controls bound to a container ──────
 
 class Stage {
@@ -665,6 +769,514 @@ const slides = [
         light.position.set(x, 3.2, z);
         bulb.position.copy(light.position);
       });
+    },
+  },
+
+  {
+    title: 'What is the camera? What are position and orientation?',
+    body: `
+      <p>Everything so far lives in the 3D world. The <strong>camera</strong> is the
+      imaginary eye that decides <em>what you actually see</em> — it turns the whole
+      scene into the flat picture on your screen. Move it and the view changes; the
+      world itself never moves.</p>
+      <p>A camera needs just two things. Its <strong>position</strong> is where the eye
+      sits — a single point <code>(x, y, z)</code>, drawn here as the gold arrow from
+      the origin. Its <strong>orientation</strong> is which way it faces: the red arrow
+      is the direction it looks ("forward"), and the green arrow is which way is "up"
+      so the image isn't tilted or upside-down.</p>
+      <p>The wireframe pyramid is the camera's view — everything inside it lands on
+      screen. Watch it fly around while staying locked on the knot: that's position
+      changing while orientation keeps re-aiming at the target. Drag to orbit the
+      whole setup.</p>
+    `,
+    build(stage) {
+      const { scene, camera, controls } = stage;
+      scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+      const key = new THREE.DirectionalLight(0xffffff, 0.8);
+      key.position.set(4, 6, 5); scene.add(key);
+      addAxes(scene, 3);
+
+      // The subject the demo camera is looking at.
+      const subject = new THREE.Mesh(
+        new THREE.TorusKnotGeometry(0.5, 0.17, 90, 16),
+        new THREE.MeshPhongMaterial({ color: 0x57e0c8, shininess: 70, specular: 0x8fe6d8 })
+      );
+      subject.position.set(0, 0.6, 0);
+      scene.add(subject);
+      const target = new THREE.Vector3(0, 0.6, 0);
+
+      // A second camera we *visualize* (it does not render the view we see).
+      const demoCam = new THREE.PerspectiveCamera(38, 1.5, 0.6, 3.4);
+      const helper = new THREE.CameraHelper(demoCam);
+      scene.add(helper);
+
+      const camDot = new THREE.Mesh(
+        new THREE.SphereGeometry(0.13, 20, 20),
+        new THREE.MeshBasicMaterial({ color: 0xffd166 })
+      );
+      scene.add(camDot);
+
+      const posArrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(), 1, 0xffd166, 0.3, 0.18);
+      const fwdArrow = new THREE.ArrowHelper(new THREE.Vector3(0, 0, -1), new THREE.Vector3(), 1.3, 0xff5c6c, 0.3, 0.18);
+      const upArrow = new THREE.ArrowHelper(new THREE.Vector3(0, 1, 0), new THREE.Vector3(), 1.0, 0x6cff9e, 0.26, 0.15);
+      scene.add(posArrow, fwdArrow, upArrow);
+
+      const posLbl = makeLabel('position', '#ffd166', 0.4);
+      const fwdLbl = makeLabel('forward', '#ff8a94', 0.36);
+      const upLbl = makeLabel('up', '#6cff9e', 0.34);
+      scene.add(posLbl, fwdLbl, upLbl);
+
+      camera.position.set(6.5, 4.5, 7);
+      controls.target.set(0, 0.6, 0);
+      controls.update();
+
+      const up = new THREE.Vector3(0, 1, 0);
+      stage.setUpdate((t) => {
+        const r = 4.4;
+        const camPos = new THREE.Vector3(
+          Math.cos(t * 0.4) * r,
+          2.4 + Math.sin(t * 0.3) * 1.1,
+          Math.sin(t * 0.4) * r
+        );
+        demoCam.position.copy(camPos);
+        demoCam.lookAt(target);
+        demoCam.updateProjectionMatrix();
+        demoCam.updateMatrixWorld(true);
+        helper.update();
+
+        camDot.position.copy(camPos);
+
+        posArrow.position.set(0, 0, 0);
+        posArrow.setDirection(camPos.clone().normalize());
+        posArrow.setLength(camPos.length(), 0.3, 0.18);
+
+        const fwd = target.clone().sub(camPos).normalize();
+        fwdArrow.position.copy(camPos);
+        fwdArrow.setDirection(fwd);
+        upArrow.position.copy(camPos);
+        upArrow.setDirection(up);
+
+        posLbl.position.copy(camPos.clone().multiplyScalar(0.5)).add(new THREE.Vector3(0, 0.35, 0));
+        fwdLbl.position.copy(camPos).addScaledVector(fwd, 1.5).add(new THREE.Vector3(0, 0.3, 0));
+        upLbl.position.copy(camPos).add(new THREE.Vector3(0, 1.15, 0));
+      });
+    },
+  },
+
+  {
+    title: 'What are projections? Perspective vs. orthographic',
+    body: `
+      <p>A <strong>projection</strong> is the rule for flattening the 3D world onto the
+      camera's 2D image — deciding where each point in space lands on the screen. There
+      are two classic rules, shown side by side below. Each casts the same three
+      colored points onto a translucent image plane.</p>
+      <p><strong>Perspective</strong> (left) is how eyes and real lenses work: every
+      point is projected toward a single eye point, so rays <em>converge</em>. Things
+      farther away shrink, and parallel lines meet in the distance. It looks natural
+      and gives depth.</p>
+      <p><strong>Orthographic</strong> (right) throws the rays straight along one
+      direction, perfectly <em>parallel</em>. Distance no longer shrinks anything, so
+      spacing and size are preserved exactly. That's ideal for CAD, blueprints,
+      isometric games, and diagrams where you need to measure. Orbit to compare how the
+      projected dots land.</p>
+    `,
+    build(stage) {
+      const { scene, camera, controls } = stage;
+      scene.add(new THREE.AmbientLight(0xffffff, 0.9));
+
+      // Three source points, same relative layout for both systems.
+      const basePts = [
+        new THREE.Vector3(0, 2.4, -1.3),
+        new THREE.Vector3(0, 1.4, 0),
+        new THREE.Vector3(0, 3.0, 1.3),
+      ];
+      const cols = [COL.x, COL.y, COL.z];
+
+      function buildSystem(originX, mode) {
+        const g = new THREE.Group();
+        g.position.x = originX;
+
+        // Image plane at local x = 0 (a rectangle in the y–z plane).
+        const plane = new THREE.Mesh(
+          new THREE.PlaneGeometry(3.2, 3.2),
+          new THREE.MeshBasicMaterial({ color: 0x38507a, transparent: true, opacity: 0.25, side: THREE.DoubleSide })
+        );
+        plane.rotation.y = Math.PI / 2;
+        plane.position.set(0, 2.0, 0);
+        g.add(plane);
+
+        const eye = new THREE.Vector3(-2.8, 2.0, 0); // used only in perspective
+        if (mode === 'persp') {
+          const e = new THREE.Mesh(
+            new THREE.SphereGeometry(0.14, 18, 18),
+            new THREE.MeshBasicMaterial({ color: 0xffd166 })
+          );
+          e.position.copy(eye);
+          g.add(e);
+          g.add(makeLabel('eye', '#ffd166', 0.34).translateX(eye.x).translateY(eye.y + 0.4));
+        }
+
+        basePts.forEach((p, i) => {
+          const col = cols[i];
+          const src = p.clone(); src.x = 1.7; // source sits on the +x side of the plane
+
+          g.add(new THREE.Mesh(
+            new THREE.SphereGeometry(0.11, 16, 16),
+            new THREE.MeshBasicMaterial({ color: col })
+          ).translateX(src.x).translateY(src.y).translateZ(src.z));
+
+          let proj;
+          if (mode === 'persp') {
+            const s = (0 - eye.x) / (src.x - eye.x);       // param where the ray hits x = 0
+            proj = eye.clone().add(src.clone().sub(eye).multiplyScalar(s));
+            g.add(new THREE.Line(
+              new THREE.BufferGeometry().setFromPoints([eye, src]),
+              new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 0.5 })
+            ));
+          } else {
+            proj = new THREE.Vector3(0, src.y, src.z);      // straight along −x
+            g.add(new THREE.Line(
+              new THREE.BufferGeometry().setFromPoints([src, proj]),
+              new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 0.6 })
+            ));
+          }
+          g.add(new THREE.Mesh(
+            new THREE.SphereGeometry(0.09, 16, 16),
+            new THREE.MeshBasicMaterial({ color: col })
+          ).translateX(proj.x).translateY(proj.y).translateZ(proj.z));
+        });
+
+        const lbl = makeLabel(mode === 'persp' ? 'perspective' : 'orthographic',
+          mode === 'persp' ? '#ffd166' : '#57e0c8', 0.42);
+        lbl.position.set(0, 4.0, 0);
+        g.add(lbl);
+        return g;
+      }
+
+      scene.add(buildSystem(-2.6, 'persp'));
+      scene.add(buildSystem(2.6, 'ortho'));
+
+      camera.position.set(1, 5, 9.5);
+      controls.target.set(0, 1.8, 0);
+      controls.update();
+    },
+  },
+
+  {
+    title: 'What is field of view?',
+    body: `
+      <p>Building on the camera's viewing pyramid: the <strong>field of view</strong>
+      (FOV) is the <em>angle</em> of that pyramid — how wide a slice of the world the
+      camera takes in. It's measured in degrees, spreading out from the eye.</p>
+      <p>A <strong>wide</strong> FOV (say 90°) sees a lot at once but exaggerates
+      depth, like a phone's ultra-wide or a fisheye. A <strong>narrow</strong> FOV
+      (say 20°) sees only a sliver but flattens and magnifies it, like a telephoto
+      zoom. Same camera position — only the angle changes.</p>
+      <p>Below, the eye sits on the left and the wireframe pyramid opens and closes as
+      the FOV sweeps between narrow and wide. Each box lights up teal the moment it
+      falls <em>inside</em> the view and dims when it drops out. Orbit around to see the
+      angle in 3D.</p>
+    `,
+    build(stage) {
+      const { scene, camera, controls } = stage;
+      scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+      const key = new THREE.DirectionalLight(0xffffff, 0.7);
+      key.position.set(4, 6, 5); scene.add(key);
+
+      const eyePos = new THREE.Vector3(-4.5, 1.2, 0);
+      const lookAt = new THREE.Vector3(2, 1.2, 0);
+
+      const demoCam = new THREE.PerspectiveCamera(50, 1.4, 0.5, 7);
+      demoCam.position.copy(eyePos);
+      demoCam.lookAt(lookAt);
+      const helper = new THREE.CameraHelper(demoCam);
+      scene.add(helper);
+
+      const eye = new THREE.Mesh(
+        new THREE.SphereGeometry(0.15, 20, 20),
+        new THREE.MeshBasicMaterial({ color: 0xffd166 })
+      );
+      eye.position.copy(eyePos);
+      scene.add(eye);
+
+      // A field of little pillars for the view to sweep across.
+      const objs = [];
+      for (let i = 0; i < 9; i++) {
+        const m = new THREE.Mesh(
+          new THREE.BoxGeometry(0.5, 1.1, 0.5),
+          new THREE.MeshPhongMaterial({ color: 0x33405c })
+        );
+        m.position.set(0.5 + (i % 3) * 1.3, 0.55, -3 + Math.floor(i / 3) * 3 + (i % 3) * 0.4);
+        scene.add(m);
+        objs.push(m);
+      }
+
+      const fovLbl = makeDynamicLabel('#ffd166', 0.62);
+      fovLbl.position.set(-4.5, 2.7, 0);
+      scene.add(fovLbl);
+      let lastDeg = -1;
+
+      camera.position.set(0, 6.5, 9.5);
+      controls.target.set(0, 1, 0);
+      controls.update();
+
+      stage.setUpdate((t) => {
+        const fov = 55 + Math.sin(t * 0.55) * 35;  // sweeps ~20°..90°
+        demoCam.fov = fov;
+        demoCam.updateProjectionMatrix();
+        demoCam.updateMatrixWorld(true);
+        helper.update();
+
+        const deg = Math.round(fov);
+        if (deg !== lastDeg) { fovLbl.setText('FOV ' + deg + '°'); lastDeg = deg; }
+
+        // Light up boxes that currently fall inside the camera's frustum.
+        objs.forEach((o) => {
+          const n = o.position.clone().project(demoCam);
+          const inside = Math.abs(n.x) < 1 && Math.abs(n.y) < 1 && n.z > -1 && n.z < 1;
+          o.material.color.set(inside ? 0x57e0c8 : 0x33405c);
+        });
+      });
+    },
+  },
+
+  {
+    title: 'What is physics? What can a physics engine do?',
+    body: `
+      <p>So far objects only sit where we place them. <strong>Physics</strong> makes
+      them <em>move like real matter</em>: a <strong>physics engine</strong> is code
+      that, many times per second, applies forces like <strong>gravity</strong>,
+      advances every object a tiny time-step, and then detects and resolves
+      <strong>collisions</strong> so things don't pass through each other.</p>
+      <p>With one you get, for free: falling and bouncing, stacking and toppling,
+      rolling and sliding with friction, ragdolls, cloth and rope, vehicles, and
+      explosions. Games, simulations, and VFX all lean on them so animators don't have
+      to hand-key every impact.</p>
+      <p>The demo below is a tiny engine written from scratch — gravity pulls the balls
+      down, they bounce off the floor and walls with a little energy lost each time, and
+      they collide with <em>each other</em>. Every few seconds they all get a fresh
+      upward kick. Orbit around the tumble.</p>
+    `,
+    build(stage) {
+      const { scene, camera, controls } = stage;
+      scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+      const key = new THREE.DirectionalLight(0xffffff, 1.0);
+      key.position.set(5, 9, 4); scene.add(key);
+
+      const W = 3.2; // arena half-width
+      const floor = new THREE.Mesh(
+        new THREE.PlaneGeometry(W * 2, W * 2),
+        new THREE.MeshStandardMaterial({ color: 0x18223a, roughness: 0.9 })
+      );
+      floor.rotation.x = -Math.PI / 2;
+      scene.add(floor);
+      const grid = new THREE.GridHelper(W * 2, 12, 0x2a3242, 0x1c2230);
+      grid.position.y = 0.002;
+      scene.add(grid);
+
+      const palette = [0xff5c6c, 0x6cff9e, 0x5c9dff, 0x57e0c8, 0xffd166, 0xc792ea, 0xff9e6c];
+      const balls = [];
+      for (let i = 0; i < 7; i++) {
+        const r = 0.34 + Math.random() * 0.22;
+        const m = new THREE.Mesh(
+          new THREE.SphereGeometry(r, 28, 28),
+          new THREE.MeshPhongMaterial({ color: palette[i % palette.length], shininess: 60 })
+        );
+        m.position.set((Math.random() - 0.5) * 4, 2 + Math.random() * 3, (Math.random() - 0.5) * 4);
+        scene.add(m);
+        balls.push({ mesh: m, r, v: new THREE.Vector3((Math.random() - 0.5) * 2, 0, (Math.random() - 0.5) * 2) });
+      }
+
+      camera.position.set(6.5, 5, 7.5);
+      controls.target.set(0, 1, 0);
+      controls.update();
+
+      const G = -9.8, REST = 0.72;
+      let last = 0, kicked = false;
+      stage.setUpdate((t) => {
+        let dt = t - last; last = t;
+        if (dt > 0.05) dt = 0.05;   // clamp after tab-switches
+
+        // Periodic re-launch so the motion never fully dies out.
+        if (Math.floor(t) % 5 === 0) {
+          if (!kicked) { balls.forEach((b) => { b.v.y += 6 + Math.random() * 3; }); kicked = true; }
+        } else kicked = false;
+
+        // Integrate gravity + bounce off floor and the four walls.
+        balls.forEach((b) => {
+          b.v.y += G * dt;
+          b.mesh.position.addScaledVector(b.v, dt);
+          const p = b.mesh.position;
+          if (p.y < b.r) { p.y = b.r; b.v.y = -b.v.y * REST; }
+          if (p.x > W - b.r) { p.x = W - b.r; b.v.x = -b.v.x * REST; }
+          if (p.x < -W + b.r) { p.x = -W + b.r; b.v.x = -b.v.x * REST; }
+          if (p.z > W - b.r) { p.z = W - b.r; b.v.z = -b.v.z * REST; }
+          if (p.z < -W + b.r) { p.z = -W + b.r; b.v.z = -b.v.z * REST; }
+        });
+
+        // Resolve ball-to-ball collisions (equal mass, exchange normal velocity).
+        for (let i = 0; i < balls.length; i++) {
+          for (let j = i + 1; j < balls.length; j++) {
+            const a = balls[i], c = balls[j];
+            const d = c.mesh.position.clone().sub(a.mesh.position);
+            const dist = d.length(), min = a.r + c.r;
+            if (dist > 0 && dist < min) {
+              const nrm = d.multiplyScalar(1 / dist);
+              const overlap = min - dist;
+              a.mesh.position.addScaledVector(nrm, -overlap / 2);
+              c.mesh.position.addScaledVector(nrm, overlap / 2);
+              const diff = c.v.dot(nrm) - a.v.dot(nrm);
+              if (diff < 0) {
+                a.v.addScaledVector(nrm, diff * REST);
+                c.v.addScaledVector(nrm, -diff * REST);
+              }
+            }
+          }
+        }
+      });
+    },
+  },
+
+  {
+    title: 'What are file formats, GLTF, and GLB?',
+    body: `
+      <p>To save a 3D model to disk or send it over the internet, its data — vertices,
+      faces, textures, materials, cameras — has to be written out in some agreed layout.
+      That agreed layout is a <strong>file format</strong>. The
+      <strong>extension</strong> is the short tag after the dot in a filename
+      (<code>.jpg</code>, <code>.mp3</code>, <code>.gltf</code>) that tells software
+      which format to expect.</p>
+      <p><strong>glTF</strong> is the standard format for 3D scenes — often called "the
+      JPEG of 3D." A plain <code>.gltf</code> file is <strong>text</strong> (JSON you
+      can open and read), and it usually points to <em>separate</em> companion files:
+      the geometry in a <code>.bin</code> and the images as <code>.png</code>/<code>.jpg</code>.
+      That's the trio on the left.</p>
+      <p><strong>GLB</strong> packs that whole bundle into a single <code>.glb</code>
+      file — the block on the right — so you ship one tidy file instead of three that
+      can get separated. The catch is that it's stored as <strong>binary</strong>
+      rather than readable text, which the next slide unpacks. The knot in the middle
+      is the model both formats describe.</p>
+    `,
+    build(stage) {
+      const { scene, camera, controls } = stage;
+      scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+      const key = new THREE.DirectionalLight(0xffffff, 0.9);
+      key.position.set(4, 6, 5); scene.add(key);
+
+      // The asset both formats describe.
+      const asset = new THREE.Mesh(
+        new THREE.TorusKnotGeometry(0.7, 0.24, 120, 20),
+        new THREE.MeshPhongMaterial({ color: 0xc792ea, shininess: 80, specular: 0xffffff })
+      );
+      asset.position.set(0, 1.4, 0);
+      scene.add(asset);
+
+      // Left: glTF as a bundle of separate files.
+      const gltfHead = makeLabel('glTF  —  a bundle of files', '#57e0c8', 0.44);
+      gltfHead.position.set(-3.4, 3.7, 0);
+      scene.add(gltfHead);
+
+      const gltfCards = [
+        makeFileCard([{ text: 'scene.gltf' }, { text: 'JSON text — readable', color: '#9fb4d8' }, { text: '{ "meshes": [ … ] }', color: '#8de0c8', mono: true }], '#57e0c8'),
+        makeFileCard([{ text: 'mesh.bin' }, { text: 'binary geometry', color: '#9fb4d8' }, { text: '01101001 11000101', color: '#ffd166', mono: true }], '#ffd166'),
+        makeFileCard([{ text: 'color.png' }, { text: 'texture image', color: '#9fb4d8' }, { text: '(u,v) → pixels', color: '#8de0c8', mono: true }], '#ff8a94'),
+      ];
+      gltfCards.forEach((c, i) => {
+        c.position.set(-3.4, 2.6 - i * 1.15, i * 0.3 - 0.3);
+        c.rotation.y = 0.35;
+        scene.add(c);
+      });
+
+      // Right: GLB as a single packed binary container.
+      const glbHead = makeLabel('GLB  —  one binary file', '#ffd166', 0.44);
+      glbHead.position.set(3.4, 3.7, 0);
+      scene.add(glbHead);
+
+      const container = new THREE.Mesh(
+        new THREE.BoxGeometry(2.3, 2.7, 0.5),
+        new THREE.MeshStandardMaterial({ color: 0x2a2140, roughness: 0.5, metalness: 0.2, transparent: true, opacity: 0.55 })
+      );
+      container.position.set(3.4, 1.4, -0.2);
+      scene.add(container);
+      container.add(new THREE.LineSegments(
+        new THREE.WireframeGeometry(container.geometry),
+        new THREE.LineBasicMaterial({ color: 0xffd166, transparent: true, opacity: 0.5 })
+      ));
+
+      const glbCard = makeFileCard([
+        { text: 'model.glb' },
+        { text: 'JSON + geometry + textures', color: '#9fb4d8' },
+        { text: 'all packed as raw bytes', color: '#9fb4d8' },
+        { text: '01000111 01001100 01000010', color: '#ffd166', mono: true },
+      ], '#ffd166', 2.1);
+      glbCard.position.set(3.4, 1.4, 0.06);
+      scene.add(glbCard);
+
+      camera.position.set(0, 2.6, 10);
+      controls.target.set(0, 1.5, 0);
+      controls.update();
+
+      stage.setUpdate(() => { asset.rotation.y += 0.006; asset.rotation.x += 0.003; });
+    },
+  },
+
+  {
+    title: 'What does it mean that GLB is a "binary" format?',
+    body: `
+      <p>Under the hood a computer stores everything as <strong>bits</strong> — 0s and
+      1s. The difference between a "text" format and a "binary" one is <em>how</em> those
+      bits are arranged and whether they're meant for a human to read.</p>
+      <p>A <strong>text</strong> format (like the <code>.gltf</code> JSON) writes data
+      out as readable <em>characters</em>. The number <code>0.5</code> is literally
+      stored as the characters "0", ".", "5" — open it in any text editor and you can
+      read it. A <strong>binary</strong> format skips that and writes the
+      <em>raw bytes</em> the machine uses internally: the same <code>0.5</code> becomes
+      four bytes like <code>00111111&nbsp;00000000&nbsp;00000000&nbsp;00000000</code>.
+      Compact and fast for the computer, but gibberish to a human.</p>
+      <p>That's what <strong>GLB</strong> is — the glTF data plus geometry and images
+      packed as one binary blob. Smaller files, faster loading, no readable text. The
+      wall behind is that raw byte stream; the two cards show the same value as text vs.
+      binary. Orbit around it.</p>
+    `,
+    build(stage) {
+      const { scene, camera, controls } = stage;
+      scene.add(new THREE.AmbientLight(0xffffff, 0.9));
+
+      // The "raw bytes" backdrop.
+      const panel = makeBinaryPanel(6.4);
+      panel.mesh.position.set(0, 1.8, -1.2);
+      scene.add(panel.mesh);
+
+      // Same value, two ways: readable text vs. the raw bytes.
+      const textCard = makeFileCard([
+        { text: '.gltf  —  text' },
+        { text: 'human-readable', color: '#9fb4d8' },
+        { text: '"height": 0.5', color: '#8de0c8', mono: true },
+      ], '#57e0c8', 2.2);
+      textCard.position.set(-2.1, 1.8, 0.6);
+      textCard.rotation.y = 0.28;
+      scene.add(textCard);
+
+      const binCard = makeFileCard([
+        { text: '.glb  —  binary' },
+        { text: 'raw bytes for the machine', color: '#9fb4d8' },
+        { text: '00111111 00000000', color: '#ffd166', mono: true },
+        { text: '00000000 00000000', color: '#ffd166', mono: true },
+      ], '#ffd166', 2.4);
+      binCard.position.set(2.2, 1.8, 0.6);
+      binCard.rotation.y = -0.28;
+      scene.add(binCard);
+
+      // A small "=" bridge between the two cards.
+      const eq = makeLabel('=', '#eef1f6', 0.6);
+      eq.position.set(0.05, 1.8, 0.8);
+      scene.add(eq);
+
+      camera.position.set(0, 2.4, 9);
+      controls.target.set(0, 1.8, 0);
+      controls.update();
+
+      stage.setUpdate((t) => panel.tick(t));
     },
   },
 ];
