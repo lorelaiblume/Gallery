@@ -12,6 +12,16 @@
   <a class="lw-home" href="/">← LORELAI BLUME</a>
   <h1 class="lw-title">LorWorld</h1>
 
+  <div class="lw-mode" id="modeHud">
+    <span class="lw-mode-label">View</span>
+    <span class="lw-mode-name" id="modeName">First Person</span>
+    <div class="lw-mode-keys">
+      <span class="lw-mode-key active" data-mode="firstPerson">1 First Person</span>
+      <span class="lw-mode-key" data-mode="flyover">2 Flyover</span>
+      <span class="lw-mode-key" data-mode="map">3 Map</span>
+    </div>
+  </div>
+
   <div class="lw-controls" id="controls">
     <div class="lw-keys">
       <span class="lw-key">W</span>
@@ -27,9 +37,15 @@
 
   <div class="lw-edit hidden" id="editPanel">
     <span class="lw-edit-name" id="editName">design</span>
+    <span class="lw-edit-rot hidden" id="rotWrap">
+      <button class="lw-edit-btn" id="rotL" title="Rotate left">⟲</button>
+      <button class="lw-edit-btn" id="rotR" title="Rotate right">⟳</button>
+    </span>
     <button class="lw-edit-btn" id="renameBtn">Rename</button>
     <button class="lw-edit-btn lw-edit-del" id="deleteBtn">Delete</button>
   </div>
+
+  <div class="lw-maphint hidden" id="mapHint">Click a drawing to select · drag to move · ⟲⟳ to rotate · drag empty space to pan · scroll to zoom</div>
 
   <div class="lw-modal hidden" id="modal">
     <div class="lw-modal-bar">

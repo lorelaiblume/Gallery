@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Glass Canopy — Shiny Elzing-Crift</title>
+  <style>
+    :root { color-scheme: dark; }
+    html, body { margin: 0; height: 100%; background: #0a0d14; color: #eef1f6;
+                 font-family: -apple-system, Segoe UI, Karla, sans-serif; overflow: hidden; }
+    #app { position: fixed; inset: 0; }
+    canvas { display: block; }
+    #loading { position: fixed; inset: 0; display: grid; place-items: center; z-index: 20;
+               font-size: 14px; color: #9fb4d8; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="loading">Loading your vehicle…</div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+    const app = document.getElementById('app');
+
+    // ── Renderer / scene / camera ──────────────────────────────────────────
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+    app.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    // Light vertical gradient backdrop.
+    (function () {
+      const c = document.createElement('canvas'); c.width = 16; c.height = 256;
+      const ctx = c.getContext('2d');
+      const grad = ctx.createLinearGradient(0, 0, 0, 256);
+      grad.addColorStop(0, '#41527a');
+      grad.addColorStop(0.55, '#232f47');
+      grad.addColorStop(1, '#0c1018');
+      ctx.fillStyle = grad; ctx.fillRect(0, 0, 16, 256);
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      scene.background = tex;
+    })();
+
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+    const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.01, 5000);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+
+    // ── Backdrop (unit scale, scaled to the model after load) ────────────────
+    const backdrop = new THREE.Group();
+    scene.add(backdrop);
+    backdrop.add(new THREE.GridHelper(10, 20, 0x3a4763, 0x222c40));
+    const pillarColors = [0xff5c6c, 0x6cff9e, 0x5c9dff, 0xffd166, 0xc792ea, 0x57e0c8, 0xff9e6c];
+    for (let i = 0; i < pillarColors.length; i++) {
+      const a = (i / pillarColors.length) * Math.PI * 2;
+      const pil = new THREE.Mesh(
+        new THREE.BoxGeometry(0.22, 1.6, 0.22),
+        new THREE.MeshStandardMaterial({ color: pillarColors[i], roughness: 0.35, metalness: 0.1,
+          emissive: pillarColors[i], emissiveIntensity: 0.5 })
+      );
+      pil.position.set(Math.cos(a) * 2.3, 0.8, Math.sin(a) * 2.3);
+      backdrop.add(pil);
+    }
+    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+    const key = new THREE.DirectionalLight(0xffffff, 1.4); key.position.set(60, 100, 40);
+    const fill = new THREE.DirectionalLight(0x88aaff, 0.6); fill.position.set(-50, 30, -40);
+    scene.add(key, fill);
+
+    // ── Glass canopy ─────────────────────────────────────────────────────────
+    // ior 1.0 + thickness 0 → a thin "windshield": you see straight through it with
+    // NO refraction distortion, while clearcoat/reflections keep the glassy sheen.
+    const glassMat = new THREE.MeshPhysicalMaterial({
+      color: 0xdff2ff, metalness: 0, roughness: 0.05,
+      transmission: 1, ior: 1.0, thickness: 0,
+      transparent: true, envMapIntensity: 1.3, side: THREE.DoubleSide,
+      clearcoat: 0.7, clearcoatRoughness: 0.08,
+    });
+    // Full sphere (not a cap): it nests fully inside the pink shell, so it's hidden
+    // everywhere except the cockpit opening, where it fills the whole hole with glass.
+    const canopy = new THREE.Mesh(
+      new THREE.SphereGeometry(1, 96, 64),
+      glassMat
+    );
+    // Baked-in placement (world units), tuned to sit over the penguin.
+    // Radius set just UNDER the pink shell (9.5) so the glass nests inside it: the pink
+    // renders in front everywhere except the open cockpit, so the top stays solid pink
+    // (no z-fighting) and the glass only shows through the window over the penguin.
+    canopy.scale.setScalar(9.5);
+    canopy.position.set(0, 14.2, 0.0);
+    canopy.rotation.set(-0.02, 0, 0);
+    scene.add(canopy);
+
+    // ── Load the vehicle ────────────────────────────────────────────────────
+    new GLTFLoader().load('vehicle.glb', (gltf) => {
+      const root = gltf.scene;
+      const box = new THREE.Box3().setFromObject(root);
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      root.position.sub(center);
+      root.position.y += size.y / 2;
+      scene.add(root);
+
+      const maxDim = Math.max(size.x, size.y, size.z);
+      backdrop.scale.setScalar(maxDim);
+
+      const dist = maxDim * 2.2;
+      camera.position.set(dist * 0.42, dist * 0.42, dist * 0.85);
+      controls.target.set(0, size.y * 0.5, 0);
+      controls.update();
+
+      document.getElementById('loading').remove();
+    }, undefined, (err) => {
+      document.getElementById('loading').textContent =
+        'Could not load vehicle.glb — is the local server running?';
+      console.error(err);
+    });
+
+    // ── Resize + loop ──────────────────────────────────────────────────────────
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+    renderer.setAnimationLoop(() => {
+      controls.update();
+      renderer.render(scene, camera);
+    });
+  </script>
+</body>
+</html>

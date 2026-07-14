@@ -40,6 +40,49 @@ body {
   text-shadow: 0 0 18px rgba(87, 224, 200, 0.5);
 }
 
+.lw-mode {
+  position: fixed;
+  right: 20px; top: 16px;
+  z-index: 5;
+  text-align: right;
+  pointer-events: none;
+}
+.lw-mode-label {
+  display: block;
+  color: #7c8296;
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+.lw-mode-name {
+  display: block;
+  color: #57e0c8;
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 14px rgba(87, 224, 200, 0.5);
+  margin-top: 2px;
+}
+.lw-mode-keys { display: flex; gap: 6px; justify-content: flex-end; margin-top: 8px; }
+.lw-mode-key {
+  border: 1px solid #24343f;
+  border-radius: 6px;
+  padding: 3px 8px;
+  color: #7c8296;
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  background: rgba(8, 20, 22, 0.5);
+  transition: color .2s, border-color .2s, box-shadow .2s;
+  pointer-events: auto;   /* clickable even though the HUD wrapper isn't */
+  cursor: pointer;
+}
+.lw-mode-key:hover { color: #eef1f6; border-color: #3a4b58; }
+.lw-mode-key.active {
+  color: #57e0c8;
+  border-color: #2b6d66;
+  box-shadow: 0 0 12px rgba(87, 224, 200, 0.2);
+}
+
 .lw-controls {
   position: fixed;
   left: 50%; bottom: 22px;
@@ -123,6 +166,25 @@ body {
   transition: opacity .2s;
 }
 .lw-edit.hidden { opacity: 0; pointer-events: none; }
+.lw-edit-rot { display: inline-flex; gap: 6px; }
+.lw-edit-rot.hidden { display: none; }
+
+.lw-maphint {
+  position: fixed;
+  left: 50%; bottom: 22px;
+  transform: translateX(-50%);
+  z-index: 6;
+  padding: 8px 16px;
+  border: 1px solid #2b6d66;
+  border-radius: 8px;
+  background: rgba(6, 18, 20, 0.72);
+  color: #7fd8cc;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  pointer-events: none;
+  transition: opacity .25s;
+}
+.lw-maphint.hidden { opacity: 0; }
 .lw-edit-name {
   color: #ff8fe6;
   font-size: 0.9rem;
