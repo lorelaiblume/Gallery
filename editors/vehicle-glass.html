@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Glass Canopy — Shiny Elzing-Crift</title>
+  <title>Vehicle Glass Editor — Lorelai Blume</title>
   <style>
     :root { color-scheme: dark; }
     html, body { margin: 0; height: 100%; background: #0a0d14; color: #eef1f6;
@@ -28,11 +28,18 @@
     .row.tint { display: flex; align-items: center; justify-content: space-between; }
     .row.tint input[type=color] { width: 42px; height: 26px; border: none; background: none; padding: 0; cursor: pointer; }
     .hint { margin-top: 12px; font-size: 11px; color: #6b7890; }
+    .home {
+      position: fixed; left: 16px; bottom: 14px; z-index: 20;
+      color: #7c8296; text-decoration: none; font-size: 0.72rem;
+      letter-spacing: 0.18em; text-transform: uppercase; transition: color .2s;
+    }
+    .home:hover { color: #57e0c8; }
   </style>
 </head>
 <body>
   <div id="app"></div>
   <div id="loading">Loading your vehicle…</div>
+  <a class="home" href="/">← Lorelai Blume</a>
 
   <div id="panel">
     <h1>Glass Canopy</h1>
