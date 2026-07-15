@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Balloon Dog — Lorelai Blume</title>
+  <style>
+    :root { color-scheme: dark; }
+    html, body { margin: 0; height: 100%; background: #0a0d14; color: #eef1f6;
+                 font-family: -apple-system, Segoe UI, Karla, sans-serif; overflow: hidden; }
+    #app { position: fixed; inset: 0; }
+    canvas { display: block; }
+    #loading { position: fixed; inset: 0; display: grid; place-items: center; z-index: 20;
+               font-size: 14px; color: #9fb4d8; }
+    .home { position: fixed; left: 16px; bottom: 14px; z-index: 20;
+      color: #7c8296; text-decoration: none; font-size: 0.72rem;
+      letter-spacing: 0.18em; text-transform: uppercase; transition: color .2s; }
+    .home:hover { color: #f5a3d3; }
+    .caption { position: fixed; left: 50%; top: 18px; transform: translateX(-50%);
+      z-index: 10; color: #9fb4d8; font-size: 12px; letter-spacing: .04em; }
+    #hint { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%);
+      z-index: 10; color: #6b7890; font-size: 11px; letter-spacing: .04em; }
+
+    /* ---- editor panel ---- */
+    #editor {
+      position: fixed; top: 16px; right: 16px; width: 244px; padding: 15px 17px;
+      background: rgba(16,21,31,0.86); backdrop-filter: blur(8px);
+      border: 1px solid #2a3242; border-radius: 14px; z-index: 30; user-select: none;
+      display: none; box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    }
+    #editor.show { display: block; }
+    #editor h1 { font-size: 14px; margin: 0 0 2px; display:flex; justify-content:space-between; align-items:center; }
+    #editor .x { cursor: pointer; color: #7c8296; font-size: 18px; line-height: 1; }
+    #editor .x:hover { color: #f5a3d3; }
+    #editor .sub { font-size: 11px; color: #8b96ac; margin: 0 0 12px; }
+    #editor .grp { font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+                   color: #6b7890; margin: 14px 0 6px; }
+    #editor .row { margin: 9px 0; font-size: 12px; }
+    #editor .row label { display: flex; justify-content: space-between; color: #b9c4d8; margin-bottom: 4px; }
+    #editor .row label span { color: #f5a3d3; font-variant-numeric: tabular-nums; }
+    #editor .row input[type=range] { width: 100%; accent-color: #f5a3d3; }
+    .paintrow { display: flex; align-items: center; gap: 10px; }
+    .paintrow input[type=color] { width: 46px; height: 30px; border: none; background: none; padding: 0; cursor: pointer; }
+    .swatches { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+    .sw { width: 20px; height: 20px; border-radius: 6px; cursor: pointer; border: 1px solid rgba(255,255,255,0.15); }
+    .sw:hover { transform: scale(1.12); }
+    .tabs { display:flex; gap:6px; margin: 2px 0 12px; }
+    .tab { flex:1; padding:6px; font-size:12px; cursor:pointer; background:#161d29; color:#8b96ac;
+           border:1px solid #2a3242; border-radius:8px; }
+    .tab.active { color:#f5a3d3; border-color:#f5a3d3; background:rgba(245,163,211,0.08); }
+    .btn { display:block; width:100%; margin:2px 0 12px; padding:9px; font-size:13px; cursor:pointer;
+           background:#f5a3d3; color:#1a1020; border:none; border-radius:9px; font-weight:600; }
+    .btn:hover { filter:brightness(1.06); }
+    .btn.on { background:#57e0c8; }
+    .hint2 { font-size:11px; color:#6b7890; line-height:1.5; margin-top:10px; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="loading">Twisting your balloon dog…</div>
+  <div class="caption">drag to spin · scroll to zoom</div>
+  <div id="hint">click the dog to edit it</div>
+  <a class="home" href="/">← Lorelai Blume</a>
+
+  <div id="editor">
+    <h1>Balloon dog <span class="x" id="edClose">×</span></h1>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="look">Look</button>
+      <button class="tab" data-tab="walk">Walk</button>
+    </div>
+
+    <div id="tabLook">
+      <div class="paintrow">
+        <input id="edColor" type="color" value="#ef5aa8" />
+        <span style="font-size:11px;color:#8b96ac">pick a balloon color</span>
+      </div>
+      <div class="swatches" id="edSwatches"></div>
+
+      <div class="row" style="margin-top:14px"><label>Smoothness <span id="vSmooth">1</span></label>
+        <input id="edSmooth" type="range" min="0" max="3" step="1" value="1" /></div>
+      <div class="row"><label>Highlights <span id="vHi">1.00</span></label>
+        <input id="edHi" type="range" min="0" max="2" step="0.01" value="1" /></div>
+    </div>
+
+    <div id="tabWalk" style="display:none">
+      <button class="btn" id="walkBtn">▶ Walk</button>
+      <div class="row"><label>Speed <span id="vSpeed">1.5</span></label>
+        <input id="wSpeed" type="range" min="0.2" max="3" step="0.1" value="1.5" /></div>
+      <div class="row"><label>Step size <span id="vSwing">0.50</span></label>
+        <input id="wSwing" type="range" min="0" max="0.9" step="0.01" value="0.5" /></div>
+      <div class="row"><label>Bounce <span id="vBob">0.12</span></label>
+        <input id="wBob" type="range" min="0" max="0.5" step="0.01" value="0.12" /></div>
+      <p class="hint2">Legs swing in a diagonal trot. He's a single fused balloon, so this bends the four leg regions around their hips — a fun preview, not a real skeleton.</p>
+    </div>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module">
+  import * as THREE from 'three';
+  import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+  import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+  import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+  const app = document.getElementById('app');
+
+  // ── renderer / scene / camera ──
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.1;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  app.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  (function () {
+    const c = document.createElement('canvas'); c.width = 16; c.height = 256;
+    const ctx = c.getContext('2d');
+    const grad = ctx.createLinearGradient(0, 0, 0, 256);
+    grad.addColorStop(0, '#26314c'); grad.addColorStop(0.6, '#141a28'); grad.addColorStop(1, '#0a0d14');
+    ctx.fillStyle = grad; ctx.fillRect(0, 0, 16, 256);
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+    scene.background = tex;
+  })();
+
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+  const camera = new THREE.PerspectiveCamera(42, innerWidth/innerHeight, 0.01, 1000);
+  camera.position.set(6, 4, 8);
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true; controls.dampingFactor = 0.08;
+  controls.autoRotate = true; controls.autoRotateSpeed = 0.8;
+  controls.target.set(0, 2, 0);
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+  const key = new THREE.DirectionalLight(0xffffff, 1.2);
+  key.position.set(6, 12, 7); key.castShadow = true;
+  key.shadow.mapSize.set(2048,2048);
+  key.shadow.camera.near = 1; key.shadow.camera.far = 44;
+  key.shadow.camera.left = -12; key.shadow.camera.right = 12;
+  key.shadow.camera.top = 12; key.shadow.camera.bottom = -12;
+  key.shadow.bias = -0.0004; scene.add(key);
+  const rim = new THREE.DirectionalLight(0xf5a3d3, 0.4); rim.position.set(-7, 5, -6); scene.add(rim);
+
+  const ground = new THREE.Mesh(new THREE.CircleGeometry(13, 56),
+                  new THREE.MeshStandardMaterial({ color: 0x141a26, roughness: 1 }));
+  ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; scene.add(ground);
+  const gridRing = new THREE.Mesh(new THREE.RingGeometry(12.4, 13, 72),
+                  new THREE.MeshBasicMaterial({ color: 0xf5a3d3, transparent:true, opacity:0.22, side:THREE.DoubleSide }));
+  gridRing.rotation.x = -Math.PI/2; gridRing.position.y = 0.01; scene.add(gridRing);
+
+  // ── load the dog ──
+  let dogMat = null, dogMesh = null, pivot = null, baseScale = 1, seatY = 0;
+
+  // ── walk state ──
+  let walking = false, walkT = 0, walkSpeed = 1.5, walkSwing = 0.5, walkBob = 0.12;
+  let restPos = null, legId = null, legW = null, hips = null;
+  const LEG_PHASE = [0, Math.PI, Math.PI, 0];   // FL, FR, BL, BR  → diagonal trot
+
+  function computeLegData(){
+    const p = dogMesh.geometry.getAttribute('position').array;
+    const N = p.length/3;
+    restPos = Float32Array.from(p);
+    let mnx=1e9,mxx=-1e9,mny=1e9,mxy=-1e9,mnz=1e9,mxz=-1e9;
+    for (let i=0;i<N;i++){ const x=p[i*3],y=p[i*3+1],z=p[i*3+2];
+      if(x<mnx)mnx=x; if(x>mxx)mxx=x; if(y<mny)mny=y; if(y>mxy)mxy=y; if(z<mnz)mnz=z; if(z>mxz)mxz=z; }
+    const midX=(mnx+mxx)/2, midZ=(mnz+mxz)/2, thr=mny+(mxy-mny)*0.42;
+    legId = new Int8Array(N).fill(-1); legW = new Float32Array(N);
+    const sx=[0,0,0,0], sz=[0,0,0,0], cnt=[0,0,0,0];
+    for (let i=0;i<N;i++){ const y=p[i*3+1]; if(y>=thr) continue;
+      const f = p[i*3+2] < midZ ? 0 : 1;   // front / back
+      const l = p[i*3]   < midX ? 0 : 1;   // left / right
+      const id = f*2 + l;                  // 0 FL, 1 FR, 2 BL, 3 BR
+      legId[i]=id; legW[i]=(thr - y)/(thr - mny);
+      sx[id]+=p[i*3]; sz[id]+=p[i*3+2]; cnt[id]++;
+    }
+    hips = [];
+    for (let k=0;k<4;k++) hips.push({ x: cnt[k]?sx[k]/cnt[k]:0, y: thr, z: cnt[k]?sz[k]/cnt[k]:0 });
+  }
+  function restoreRest(){
+    if(!restPos || !dogMesh) return;
+    const a = dogMesh.geometry.getAttribute('position'); a.array.set(restPos); a.needsUpdate = true;
+  }
+  function deformWalk(){
+    const a = dogMesh.geometry.getAttribute('position'); const p = a.array; const N = p.length/3;
+    for (let i=0;i<N;i++){ const id = legId[i]; if(id<0) continue;
+      const th = walkSwing * legW[i] * Math.sin(walkT + LEG_PHASE[id]);
+      const h = hips[id];
+      const ry = restPos[i*3+1]-h.y, rz = restPos[i*3+2]-h.z, c = Math.cos(th), s = Math.sin(th);
+      p[i*3]   = restPos[i*3];
+      p[i*3+1] = h.y + ry*c - rz*s;
+      p[i*3+2] = h.z + ry*s + rz*c;
+    }
+    a.needsUpdate = true;
+  }
+  function setWalking(on){
+    if(on){ if(!dogMesh) return; computeLegData(); walking = true; walkBtn.classList.add('on'); walkBtn.textContent = '⏸ Stop'; }
+    else { walking = false; restoreRest(); if(pivot) pivot.position.y = seatY; walkBtn.classList.remove('on'); walkBtn.textContent = '▶ Walk'; }
+  }
+
+  // ── Loop subdivision: "Smoothness" adds faces so the surface rounds out ──
+  const rawLevels = [], geoLevels = [];
+  let curLevel = 1;
+
+  function weldGeo(geo){
+    const p = geo.getAttribute('position').array;
+    const index = geo.index ? geo.index.array : null;
+    const map = new Map(), wpos = [], wid = new Int32Array(p.length/3), q = 1e4;
+    for (let i=0;i<p.length/3;i++){
+      const k = Math.round(p[i*3]*q)+"_"+Math.round(p[i*3+1]*q)+"_"+Math.round(p[i*3+2]*q);
+      let id = map.get(k);
+      if (id===undefined){ id = wpos.length/3; map.set(k,id); wpos.push(p[i*3],p[i*3+1],p[i*3+2]); }
+      wid[i] = id;
+    }
+    let idx;
+    if (index){ idx = new Uint32Array(index.length); for (let i=0;i<index.length;i++) idx[i]=wid[index[i]]; }
+    else { idx = new Uint32Array(p.length/3); for (let i=0;i<idx.length;i++) idx[i]=wid[i]; }
+    return { pos: new Float32Array(wpos), idx };
+  }
+
+  function loopSubdivide({pos, idx}){
+    const NV = pos.length/3, NF = idx.length/3;
+    const ekey = (a,b) => (a<b?a:b)*NV + (a<b?b:a);
+    const edges = new Map();
+    const neigh = Array.from({length:NV}, () => new Set());
+    for (let f=0; f<NF; f++){
+      const a=idx[f*3], b=idx[f*3+1], c=idx[f*3+2];
+      const tri=[[a,b,c],[b,c,a],[c,a,b]];
+      for (const [u,v,w] of tri){
+        const k=ekey(u,v); let e=edges.get(k);
+        if(!e){ e={a:u<v?u:v,b:u<v?v:u,opp:[],cnt:0}; edges.set(k,e); }
+        e.opp.push(w); e.cnt++; neigh[u].add(v); neigh[v].add(u);
+      }
+    }
+    const epIndex = new Map(); const newpos = Array.from(pos); let next = NV;
+    for (const [k,e] of edges){
+      const a=e.a, b=e.b; let x,y,z;
+      if (e.cnt===2){ const c=e.opp[0], d=e.opp[1];
+        x=3/8*(pos[a*3]+pos[b*3])+1/8*(pos[c*3]+pos[d*3]);
+        y=3/8*(pos[a*3+1]+pos[b*3+1])+1/8*(pos[c*3+1]+pos[d*3+1]);
+        z=3/8*(pos[a*3+2]+pos[b*3+2])+1/8*(pos[c*3+2]+pos[d*3+2]);
+      } else { x=(pos[a*3]+pos[b*3])/2; y=(pos[a*3+1]+pos[b*3+1])/2; z=(pos[a*3+2]+pos[b*3+2])/2; }
+      epIndex.set(k,next); newpos.push(x,y,z); next++;
+    }
+    const boundary = new Uint8Array(NV);
+    for (const [,e] of edges) if (e.cnt===1){ boundary[e.a]=1; boundary[e.b]=1; }
+    for (let v=0; v<NV; v++){
+      const nb=[...neigh[v]], n=nb.length;
+      if (boundary[v] || n===0) continue;
+      const beta=(1/n)*(5/8-Math.pow(3/8+1/4*Math.cos(2*Math.PI/n),2));
+      let sx=0,sy=0,sz=0; for (const u of nb){ sx+=pos[u*3]; sy+=pos[u*3+1]; sz+=pos[u*3+2]; }
+      newpos[v*3]=(1-n*beta)*pos[v*3]+beta*sx;
+      newpos[v*3+1]=(1-n*beta)*pos[v*3+1]+beta*sy;
+      newpos[v*3+2]=(1-n*beta)*pos[v*3+2]+beta*sz;
+    }
+    const nidx=[];
+    for (let f=0; f<NF; f++){
+      const a=idx[f*3], b=idx[f*3+1], c=idx[f*3+2];
+      const ab=epIndex.get(ekey(a,b)), bc=epIndex.get(ekey(b,c)), ca=epIndex.get(ekey(c,a));
+      nidx.push(a,ab,ca, ab,b,bc, ca,bc,c, ab,bc,ca);
+    }
+    return { pos:new Float32Array(newpos), idx:new Uint32Array(nidx) };
+  }
+
+  function makeGeometry({pos, idx}){
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos,3));
+    g.setIndex(new THREE.BufferAttribute(idx,1));
+    g.computeVertexNormals(); g.computeBoundingBox(); g.computeBoundingSphere();
+    return g;
+  }
+
+  function setSmoothLevel(L){
+    L = Math.max(0, Math.min(3, L|0));
+    const wasWalking = walking;
+    if (wasWalking) restoreRest();                 // un-deform current geo before swapping
+    while (rawLevels.length <= L) rawLevels.push(loopSubdivide(rawLevels[rawLevels.length-1]));
+    while (geoLevels.length <= L) geoLevels.push(makeGeometry(rawLevels[geoLevels.length]));
+    if (dogMesh) dogMesh.geometry = geoLevels[L];
+    curLevel = L;
+    if (wasWalking) computeLegData();              // rebuild rest + leg groups for new geo
+  }
+
+  function reseat(mult){
+    pivot.scale.setScalar(baseScale * mult);
+    pivot.position.set(0,0,0);
+    pivot.updateMatrixWorld(true);
+    const wb = new THREE.Box3().setFromObject(pivot);
+    pivot.position.y -= wb.min.y;
+    pivot.position.x -= (wb.min.x + wb.max.x)/2;
+    pivot.position.z -= (wb.min.z + wb.max.z)/2;
+  }
+
+  new GLTFLoader().load('dog.glb', (gltf) => {
+    const root = gltf.scene;
+    root.traverse(o => {
+      if (o.isMesh) {
+        o.castShadow = true; o.receiveShadow = true;
+        dogMesh = o; dogMat = o.material;
+      }
+    });
+
+    // material defaults for glossy plastic
+    if (dogMat) {
+      dogMat.emissive = dogMat.emissive || new THREE.Color(0x000000);
+      dogMat.roughness = 0.25;
+      dogMat.envMapIntensity = +$('edHi').value;
+      $('edColor').value = '#' + dogMat.color.getHexString();
+    }
+
+    // build subdivision level 0 (welded original) and apply default smoothness
+    rawLevels.length = 0; geoLevels.length = 0;
+    rawLevels.push(weldGeo(dogMesh.geometry));
+    geoLevels.push(makeGeometry(rawLevels[0]));
+    setSmoothLevel(+$('edSmooth').value);
+
+    const box = new THREE.Box3().setFromObject(root);
+    const size = new THREE.Vector3(), center = new THREE.Vector3();
+    box.getSize(size); box.getCenter(center);
+    root.position.sub(center);                       // center at origin
+
+    pivot = new THREE.Group(); pivot.add(root); scene.add(pivot);
+    baseScale = 4.6 / Math.max(size.x, size.y, size.z);
+    reseat(1);
+    seatY = pivot.position.y;
+
+    document.getElementById('loading').style.display = 'none';
+  }, undefined, (err) => {
+    document.getElementById('loading').textContent =
+      'Could not load dog.glb — make sure you\'re running a local server (python3 -m http.server 8000).';
+    console.error(err);
+  });
+
+  // ── editor ──
+  const raycaster = new THREE.Raycaster();
+  const pointer = new THREE.Vector2();
+  const editor = document.getElementById('editor');
+  function $(id){ return document.getElementById(id); }
+
+  function openEditor(){
+    editor.classList.add('show');
+    $('hint').style.display = 'none';
+    if (dogMat){
+      $('edColor').value = '#' + dogMat.color.getHexString();
+      $('edSmooth').value = curLevel; $('vSmooth').textContent = curLevel;
+      $('edHi').value = dogMat.envMapIntensity; $('vHi').textContent = (+dogMat.envMapIntensity).toFixed(2);
+    }
+  }
+  $('edClose').onclick = () => { editor.classList.remove('show'); $('hint').style.display = ''; };
+
+  function applyColor(hex){
+    if(!dogMat) return;
+    dogMat.color.set(hex);
+    dogMat.emissive.set(hex); dogMat.emissive.multiplyScalar(0.18);
+  }
+  $('edColor').addEventListener('input', e => applyColor(e.target.value));
+  $('edColor').addEventListener('change', e => addCustomColor(e.target.value));  // save new colors
+  $('edSmooth').addEventListener('input', e => { const L=+e.target.value; $('vSmooth').textContent = L; if(dogMesh) setSmoothLevel(L); });
+  $('edHi').addEventListener('input', e => { if(dogMat){ dogMat.envMapIntensity = +e.target.value; dogMat.needsUpdate = true; } $('vHi').textContent = (+e.target.value).toFixed(2); });
+
+
+  const PALETTE = ['#ef5aa8','#f59ccf','#c46be0','#9b7ede','#5aa9ef','#43d6c0',
+                   '#6bd66b','#ffd166','#ff8a4c','#ff5470','#ffffff','#2a2333'];
+  const sw = $('edSwatches');
+  function addSwatch(c){
+    const d = document.createElement('div'); d.className='sw'; d.style.background=c; d.title=c;
+    d.onclick = () => { applyColor(c); $('edColor').value = c; };
+    sw.appendChild(d);
+    return d;
+  }
+  PALETTE.forEach(addSwatch);
+
+  // ── custom colors: remembered across reloads ──
+  const CUSTOM_KEY = 'dogCustomColors';
+  let customColors = [];
+  try { customColors = JSON.parse(localStorage.getItem(CUSTOM_KEY) || '[]'); } catch (e) {}
+  function addCustomColor(hex){
+    hex = hex.toLowerCase();
+    if (PALETTE.includes(hex) || customColors.includes(hex)) return;   // no duplicates
+    customColors.push(hex);
+    try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(customColors)); } catch (e) {}
+    const d = addSwatch(hex);
+    d.style.outline = '1px solid rgba(245,163,211,0.5)';   // subtle mark for your own colors
+  }
+  customColors.forEach(c => { const d = addSwatch(c); d.style.outline = '1px solid rgba(245,163,211,0.5)'; });
+
+  // ── tabs ──
+  document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    $('tabLook').style.display = t.dataset.tab === 'look' ? '' : 'none';
+    $('tabWalk').style.display = t.dataset.tab === 'walk' ? '' : 'none';
+  });
+
+  // ── walk controls ──
+  const walkBtn = $('walkBtn');
+  walkBtn.onclick = () => setWalking(!walking);
+  $('wSpeed').addEventListener('input', e => { walkSpeed = +e.target.value; $('vSpeed').textContent = (+e.target.value).toFixed(1); });
+  $('wSwing').addEventListener('input', e => { walkSwing = +e.target.value; $('vSwing').textContent = (+e.target.value).toFixed(2); });
+  $('wBob').addEventListener('input',   e => { walkBob   = +e.target.value; $('vBob').textContent   = (+e.target.value).toFixed(2); });
+
+  // ── click vs drag detection ──
+  let downX=0, downY=0, moved=false;
+  renderer.domElement.addEventListener('pointerdown', e=>{ downX=e.clientX; downY=e.clientY; moved=false; });
+  renderer.domElement.addEventListener('pointermove', e=>{
+    if(Math.abs(e.clientX-downX)+Math.abs(e.clientY-downY) > 4) moved=true;
+  });
+  renderer.domElement.addEventListener('pointerup', e=>{
+    if(moved || !dogMesh) return;
+    pointer.x = (e.clientX/innerWidth)*2 - 1;
+    pointer.y = -(e.clientY/innerHeight)*2 + 1;
+    raycaster.setFromCamera(pointer, camera);
+    if (raycaster.intersectObject(dogMesh, true).length) openEditor();
+  });
+
+  // ── loop ──
+  function animate(){
+    requestAnimationFrame(animate);
+    if (walking && legId){
+      walkT += 0.06 * walkSpeed;
+      deformWalk();
+      if (pivot) pivot.position.y = seatY + walkBob * Math.abs(Math.sin(walkT));
+    }
+    controls.update();
+    renderer.render(scene, camera);
+  }
+  animate();
+  addEventListener('resize', ()=>{
+    camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+  </script>
+</body>
+</html>

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Unicorn — Lorelai Blume</title>
+  <style>
+    :root { color-scheme: dark; }
+    html, body { margin: 0; height: 100%; background: #0a0d14; color: #eef1f6;
+                 font-family: -apple-system, Segoe UI, Karla, sans-serif; overflow: hidden; }
+    #app { position: fixed; inset: 0; }
+    canvas { display: block; }
+    #loading { position: fixed; inset: 0; display: grid; place-items: center; z-index: 20;
+               font-size: 14px; color: #9fb4d8; }
+    .home { position: fixed; left: 16px; bottom: 14px; z-index: 20;
+      color: #7c8296; text-decoration: none; font-size: 0.72rem;
+      letter-spacing: 0.18em; text-transform: uppercase; transition: color .2s; }
+    .home:hover { color: #f5a3d3; }
+    .caption { position: fixed; left: 50%; top: 18px; transform: translateX(-50%);
+      z-index: 10; color: #9fb4d8; font-size: 12px; letter-spacing: .04em; }
+
+    /* ---- editor panel ---- */
+    #editor {
+      position: fixed; top: 16px; right: 16px; width: 244px; padding: 15px 17px;
+      background: rgba(16,21,31,0.86); backdrop-filter: blur(8px);
+      border: 1px solid #2a3242; border-radius: 14px; z-index: 30; user-select: none;
+      display: none; box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    }
+    #editor.show { display: block; }
+    #editor h1 { font-size: 14px; margin: 0 0 2px; display:flex; justify-content:space-between; align-items:center; }
+    #editor .x { cursor: pointer; color: #7c8296; font-size: 18px; line-height: 1; }
+    #editor .x:hover { color: #f5a3d3; }
+    #editor .sub { font-size: 11px; color: #8b96ac; margin: 0 0 12px; }
+    #editor .grp { font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+                   color: #6b7890; margin: 14px 0 6px; }
+    #editor .row { margin: 9px 0; font-size: 12px; }
+    #editor .row label { display: flex; justify-content: space-between; color: #b9c4d8; margin-bottom: 4px; }
+    #editor .row label span { color: #f5a3d3; font-variant-numeric: tabular-nums; }
+    #editor .row input[type=range] { width: 100%; accent-color: #f5a3d3; }
+    .paintrow { display: flex; align-items: center; gap: 10px; }
+    .paintrow input[type=color] { width: 46px; height: 30px; border: none; background: none; padding: 0; cursor: pointer; }
+    .swatches { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+    .sw { width: 20px; height: 20px; border-radius: 6px; cursor: pointer; border: 1px solid rgba(255,255,255,0.15); }
+    .sw:hover { transform: scale(1.12); }
+    #hint { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%);
+      z-index: 10; color: #6b7890; font-size: 11px; letter-spacing: .04em; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="loading">Inflating your unicorn…</div>
+  <div class="caption">drag to spin · scroll to zoom</div>
+  <div id="hint">click the unicorn to edit it</div>
+  <a class="home" href="/">← Lorelai Blume</a>
+
+  <div id="editor">
+    <h1>Edit unicorn <span class="x" id="edClose">×</span></h1>
+    <p class="sub">Change how she looks — live.</p>
+
+    <div class="grp">Color</div>
+    <div class="paintrow">
+      <input id="edColor" type="color" value="#ef5aa8" />
+      <span style="font-size:11px;color:#8b96ac">pick a balloon color</span>
+    </div>
+    <div class="swatches" id="edSwatches"></div>
+
+    <div class="grp">Surface</div>
+    <div class="row"><label>Roughness <span id="vRough">0.28</span></label>
+      <input id="edRough" type="range" min="0" max="1" step="0.01" value="0.28" /></div>
+    <div class="row"><label>Metalness <span id="vMetal">0.15</span></label>
+      <input id="edMetal" type="range" min="0" max="1" step="0.01" value="0.15" /></div>
+    <div class="row"><label>Glow <span id="vGlow">0.35</span></label>
+      <input id="edGlow" type="range" min="0" max="1.5" step="0.01" value="0.35" /></div>
+
+    <div class="grp">Size</div>
+    <div class="row"><label>Overall <span id="vSize">1.00</span></label>
+      <input id="edSize" type="range" min="0.5" max="1.8" step="0.01" value="1" /></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+  // ---------- scene ----------
+  const app = document.getElementById('app');
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0a0d14);
+  scene.fog = new THREE.Fog(0x0a0d14, 16, 40);
+
+  const camera = new THREE.PerspectiveCamera(40, innerWidth/innerHeight, 0.1, 200);
+  let camDist = 11, camYaw = 0.85, camPitch = 0.14;
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  app.appendChild(renderer.domElement);
+
+  scene.add(new THREE.HemisphereLight(0xcfe0ff, 0x2a2140, 0.9));
+  const key = new THREE.DirectionalLight(0xffffff, 1.05);
+  key.position.set(6, 12, 7); key.castShadow = true;
+  key.shadow.mapSize.set(2048,2048);
+  key.shadow.camera.near = 1; key.shadow.camera.far = 44;
+  key.shadow.camera.left = -12; key.shadow.camera.right = 12;
+  key.shadow.camera.top = 12; key.shadow.camera.bottom = -12;
+  key.shadow.bias = -0.0004; scene.add(key);
+  const rim = new THREE.DirectionalLight(0xf5a3d3, 0.5);
+  rim.position.set(-7, 5, -6); scene.add(rim);
+  const sheen = new THREE.PointLight(0xffffff, 0.6, 60);
+  sheen.position.set(3, 8, 5); scene.add(sheen);
+
+  const ground = new THREE.Mesh(new THREE.CircleGeometry(13, 56),
+                  new THREE.MeshStandardMaterial({ color: 0x141a26, roughness: 1 }));
+  ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; scene.add(ground);
+  const gridRing = new THREE.Mesh(new THREE.RingGeometry(12.4, 13, 72),
+                  new THREE.MeshBasicMaterial({ color: 0xf5a3d3, transparent:true, opacity:0.22, side:THREE.DoubleSide }));
+  gridRing.rotation.x = -Math.PI/2; gridRing.position.y = 0.01; scene.add(gridRing);
+
+  // ---------- glossy balloon-latex material ----------
+  const balloonMat = new THREE.MeshStandardMaterial({
+    color: 0xef5aa8, roughness: 0.28, metalness: 0.15,
+    emissive: 0x2a0a1c, emissiveIntensity: 0.35
+  });
+
+  // ---------- tiny binary STL parser (no external loader) ----------
+  function parseSTL(buffer){
+    const dv = new DataView(buffer);
+    const n = dv.getUint32(80, true);
+    const pos = new Float32Array(n*9);
+    const nor = new Float32Array(n*9);
+    let off = 84, p = 0;
+    for (let i=0;i<n;i++){
+      const nx=dv.getFloat32(off,true), ny=dv.getFloat32(off+4,true), nz=dv.getFloat32(off+8,true);
+      off += 12;
+      for (let v=0;v<3;v++){
+        pos[p]=dv.getFloat32(off,true); pos[p+1]=dv.getFloat32(off+4,true); pos[p+2]=dv.getFloat32(off+8,true);
+        nor[p]=nx; nor[p+1]=ny; nor[p+2]=nz;
+        p += 3; off += 12;
+      }
+      off += 2; // attribute byte count
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos,3));
+    g.setAttribute('normal',   new THREE.BufferAttribute(nor,3));
+    return g;
+  }
+
+  // ---------- load the model ----------
+  let modelReady = false, unicornMesh = null, pivot = null, baseScale = 1;
+
+  function reseat(mult){
+    pivot.scale.setScalar(baseScale * mult);
+    pivot.position.set(0,0,0);
+    pivot.updateMatrixWorld(true);
+    const wb = new THREE.Box3().setFromObject(pivot);
+    pivot.position.y -= wb.min.y;
+    pivot.position.x -= (wb.min.x + wb.max.x)/2;
+    pivot.position.z -= (wb.min.z + wb.max.z)/2;
+  }
+
+  fetch('unicorn.stl')
+    .then(r => { if(!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+    .then(buf => {
+      const geo = parseSTL(buf);
+      geo.computeBoundingBox();
+      const bb = geo.boundingBox, size = new THREE.Vector3(), center = new THREE.Vector3();
+      bb.getSize(size); bb.getCenter(center);
+
+      unicornMesh = new THREE.Mesh(geo, balloonMat);
+      unicornMesh.castShadow = true; unicornMesh.receiveShadow = true;
+      unicornMesh.position.set(-center.x, -center.y, -center.z);  // center geometry at pivot origin
+
+      pivot = new THREE.Group();
+      pivot.add(unicornMesh);
+      pivot.rotation.x = -Math.PI/2;                       // Z-up STL -> Y-up
+      baseScale = 4.6 / Math.max(size.x, size.y, size.z);   // fit to ~4.6 units tall
+      scene.add(pivot);
+      reseat(1);
+
+      modelReady = true;
+      document.getElementById('loading').style.display = 'none';
+    })
+    .catch(err => {
+      document.getElementById('loading').textContent =
+        'Could not load unicorn.stl — make sure you\'re running a local server (python3 -m http.server 8000).';
+      console.error(err);
+    });
+
+  // ---------- editor: click to select, live edits ----------
+  const raycaster = new THREE.Raycaster();
+  const pointer = new THREE.Vector2();
+  const editor = document.getElementById('editor');
+  const $ = id => document.getElementById(id);
+
+  function openEditor(){
+    editor.classList.add('show');
+    $('hint').style.display = 'none';
+    // sync controls to current material
+    $('edColor').value = '#' + balloonMat.color.getHexString();
+    $('edRough').value = balloonMat.roughness; $('vRough').textContent = (+balloonMat.roughness).toFixed(2);
+    $('edMetal').value = balloonMat.metalness; $('vMetal').textContent = (+balloonMat.metalness).toFixed(2);
+    $('edGlow').value  = balloonMat.emissiveIntensity; $('vGlow').textContent = (+balloonMat.emissiveIntensity).toFixed(2);
+  }
+  $('edClose').onclick = () => { editor.classList.remove('show'); $('hint').style.display = ''; };
+
+  function applyColor(hex){
+    balloonMat.color.set(hex);
+    balloonMat.emissive.set(hex);
+    balloonMat.emissive.multiplyScalar(0.18);  // glow tints toward body color
+  }
+  $('edColor').addEventListener('input', e => applyColor(e.target.value));
+  $('edRough').addEventListener('input', e => { balloonMat.roughness = +e.target.value; $('vRough').textContent = (+e.target.value).toFixed(2); });
+  $('edMetal').addEventListener('input', e => { balloonMat.metalness = +e.target.value; $('vMetal').textContent = (+e.target.value).toFixed(2); });
+  $('edGlow').addEventListener('input',  e => { balloonMat.emissiveIntensity = +e.target.value; $('vGlow').textContent = (+e.target.value).toFixed(2); });
+  $('edSize').addEventListener('input',  e => { if(modelReady) reseat(+e.target.value); $('vSize').textContent = (+e.target.value).toFixed(2); });
+
+  const PALETTE = ['#ef5aa8','#f59ccf','#c46be0','#9b7ede','#5aa9ef','#43d6c0',
+                   '#6bd66b','#ffd166','#ff8a4c','#ff5470','#ffffff','#2a2333'];
+  const sw = $('edSwatches');
+  PALETTE.forEach(c => {
+    const d = document.createElement('div'); d.className='sw'; d.style.background=c; d.title=c;
+    d.onclick = () => { applyColor(c); $('edColor').value = c; };
+    sw.appendChild(d);
+  });
+
+  // ---------- camera controls (+ click detection) ----------
+  let dragging=false, moved=false, lx=0, ly=0;
+  renderer.domElement.addEventListener('pointerdown', e=>{ dragging=true; moved=false; lx=e.clientX; ly=e.clientY; });
+  addEventListener('pointerup', e=>{
+    dragging=false;
+    if(moved || !modelReady) return;   // was a drag, not a click
+    pointer.x = (e.clientX/innerWidth)*2 - 1;
+    pointer.y = -(e.clientY/innerHeight)*2 + 1;
+    raycaster.setFromCamera(pointer, camera);
+    if (raycaster.intersectObject(unicornMesh, false).length) openEditor();
+  });
+  addEventListener('pointermove', e=>{
+    if(!dragging) return;
+    if(Math.abs(e.clientX-lx)+Math.abs(e.clientY-ly) > 3) moved=true;
+    camYaw -= (e.clientX-lx)*0.008;
+    camPitch = Math.max(-0.1, Math.min(1.1, camPitch + (e.clientY-ly)*0.006));
+    lx=e.clientX; ly=e.clientY;
+  });
+  addEventListener('wheel', e=>{ camDist = Math.max(6, Math.min(22, camDist + e.deltaY*0.012)); }, {passive:true});
+
+  // ---------- loop ----------
+  let auto = 0;
+  function animate(){
+    requestAnimationFrame(animate);
+    if(!dragging && modelReady) auto += 0.0022;
+    const yaw = camYaw + auto;
+    camera.position.set(
+      Math.sin(yaw)*Math.cos(camPitch)*camDist,
+      2.2 + Math.sin(camPitch)*camDist,
+      Math.cos(yaw)*Math.cos(camPitch)*camDist);
+    camera.lookAt(0, 2.0, 0);
+    renderer.render(scene, camera);
+  }
+  animate();
+  addEventListener('resize', ()=>{
+    camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+  </script>
+</body>
+</html>
