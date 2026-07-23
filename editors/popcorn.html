@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Popcorn Bucket — Lorelai Blume</title>
+  <style>
+    :root { color-scheme: dark; }
+    html, body { margin: 0; height: 100%; background: #0a0d14; color: #eef1f6;
+                 font-family: -apple-system, Segoe UI, Karla, sans-serif; overflow: hidden; }
+    #app { position: fixed; inset: 0; }
+    canvas { display: block; }
+    #loading { position: fixed; inset: 0; display: grid; place-items: center; z-index: 20;
+               font-size: 14px; color: #9fb4d8; }
+    .caption { position: fixed; left: 50%; top: 18px; transform: translateX(-50%);
+      z-index: 10; color: #9fb4d8; font-size: 12px; letter-spacing: .04em; }
+    .home { position: fixed; left: 16px; bottom: 14px; z-index: 20;
+      color: #7c8296; text-decoration: none; font-size: 0.72rem;
+      letter-spacing: 0.18em; text-transform: uppercase; transition: color .2s; }
+    .home:hover { color: #f5a3d3; }
+    #panel {
+      position: fixed; top: 16px; left: 16px; width: 244px; padding: 15px 17px;
+      background: rgba(16,21,31,0.86); backdrop-filter: blur(8px);
+      border: 1px solid #2a3242; border-radius: 14px; z-index: 10; user-select: none;
+      max-height: calc(100vh - 32px); overflow-y: auto;
+    }
+    #panel h1 { font-size: 15px; margin: 0 0 2px; }
+    #panel .sub { font-size: 12px; color: #9fb4d8; margin: 0 0 12px; }
+    .grp { font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+           color: #6b7890; margin: 15px 0 7px; }
+    .crow { display:flex; align-items:center; justify-content:space-between; font-size:12px;
+            color:#b9c4d8; margin:8px 0; }
+    .crow input[type=color] { width: 42px; height: 26px; border: none; background: none; padding: 0; cursor: pointer; }
+    .row { margin: 9px 0; font-size: 12px; }
+    .row label { display: flex; justify-content: space-between; color: #b9c4d8; margin-bottom: 4px; }
+    .row label span { color: #ff6a5a; font-variant-numeric: tabular-nums; }
+    .row input[type=range] { width: 100%; accent-color: #e23b2e; }
+    .btn2 { display:block; width:100%; margin:4px 0 6px; padding:9px; font-size:13px; cursor:pointer;
+            background:#f5e6b8; color:#5a3b12; border:none; border-radius:9px; font-weight:600; }
+    .btn2:hover { filter:brightness(1.05); }
+    .hint2 { font-size:11px; color:#6b7890; line-height:1.5; margin:2px 0 0; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="loading">Popping the popcorn…</div>
+  <div class="caption">drag to spin · scroll to zoom</div>
+  <a class="home" href="/">← Lorelai Blume</a>
+
+  <div id="panel">
+    <h1>🍿 Popcorn Bucket</h1>
+    <p class="sub">Your building — with a door on the red side.</p>
+
+    <div class="grp">Colors</div>
+    <div class="crow"><span>Bucket (red)</span><input id="pBucket" type="color" value="#e23b2e" /></div>
+    <div class="crow"><span>Stripes</span><input id="pStripe" type="color" value="#f4f4f2" /></div>
+    <div class="crow"><span>Popcorn</span><input id="pPop" type="color" value="#f5e6b8" /></div>
+    <div class="crow"><span>Door</span><input id="pDoor" type="color" value="#8f2d24" /></div>
+
+    <div class="grp">Shape</div>
+    <div class="row"><label>Stripes <span id="vStripes">7</span></label>
+      <input id="pStripes" type="range" min="3" max="10" step="1" value="7" /></div>
+    <div class="row"><label>Popcorn <span id="vAmount">0.85</span></label>
+      <input id="pAmount" type="range" min="0" max="1" step="0.01" value="0.85" /></div>
+    <div class="row"><label>Size <span id="vSize">1.00</span></label>
+      <input id="pSize" type="range" min="0.6" max="1.6" step="0.01" value="1" /></div>
+
+    <div class="grp">Play</div>
+    <button class="btn2" id="pAdd">🍿 Add a popcorn piece</button>
+    <p class="hint2">Then drag it anywhere. Spin the view with drag on empty space.</p>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module">
+  import * as THREE from 'three';
+  import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+  import { DragControls } from 'three/addons/controls/DragControls.js';
+  import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+  import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+  const $ = id => document.getElementById(id);
+
+  // ── renderer / scene / camera ──
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  document.getElementById('app').appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0e131d);
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+  const camera = new THREE.PerspectiveCamera(42, innerWidth/innerHeight, 0.01, 200);
+  camera.position.set(5.5, 4.5, 6.5);
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true; controls.dampingFactor = 0.08;
+  controls.autoRotate = true; controls.autoRotateSpeed = 0.7;
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+  const key = new THREE.DirectionalLight(0xffffff, 1.15);
+  key.position.set(6, 12, 7); key.castShadow = true;
+  key.shadow.mapSize.set(2048,2048);
+  key.shadow.camera.near = 1; key.shadow.camera.far = 44;
+  key.shadow.camera.left = -12; key.shadow.camera.right = 12;
+  key.shadow.camera.top = 12; key.shadow.camera.bottom = -12;
+  key.shadow.bias = -0.0004; scene.add(key);
+  const fill = new THREE.DirectionalLight(0xa9c6ff, 0.3); fill.position.set(-6, 4, -6); scene.add(fill);
+
+  const ground = new THREE.Mesh(new THREE.CircleGeometry(14, 56),
+                  new THREE.MeshStandardMaterial({ color: 0x141a26, roughness: 1 }));
+  ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; scene.add(ground);
+  const gridRing = new THREE.Mesh(new THREE.RingGeometry(13.4, 14, 72),
+                  new THREE.MeshBasicMaterial({ color: 0xff6a5a, transparent:true, opacity:0.2, side:THREE.DoubleSide }));
+  gridRing.rotation.x = -Math.PI/2; gridRing.position.y = 0.01; scene.add(gridRing);
+
+  // ── shared materials ──
+  const redMat   = new THREE.MeshStandardMaterial({ color: 0xe23b2e, roughness: 0.7, metalness: 0, side: THREE.DoubleSide });
+  const whiteMat = new THREE.MeshStandardMaterial({ color: 0xf4f4f2, roughness: 0.7, metalness: 0, side: THREE.DoubleSide });
+  const popMat   = new THREE.MeshStandardMaterial({ color: 0xf5e6b8, roughness: 0.85, metalness: 0, flatShading: true });
+  const doorMat  = new THREE.MeshStandardMaterial({ color: 0x8f2d24, roughness: 0.6, metalness: 0.05 });
+  const frameMat = new THREE.MeshStandardMaterial({ color: 0xf4e3b0, roughness: 0.6, metalness: 0.05 });
+  const knobMat  = new THREE.MeshStandardMaterial({ color: 0xffcf5a, roughness: 0.3, metalness: 0.5 });
+
+  // ── params ──
+  const P = { stripes: 7, amount: 0.85, size: 1 };
+  const H = 2.6, BOT = 0.95, TOP = 1.35, CROWN = 0.24;
+
+  const bucketGroup = new THREE.Group();
+  const popGroup = new THREE.Group();
+  scene.add(bucketGroup, popGroup);
+
+  const V = (x,y,z) => new THREE.Vector3(x,y,z);
+  function quad(a,b,c,d, mat){
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+      a.x,a.y,a.z, b.x,b.y,b.z, c.x,c.y,c.z,
+      a.x,a.y,a.z, c.x,c.y,c.z, d.x,d.y,d.z ]), 3));
+    g.computeVertexNormals();
+    const m = new THREE.Mesh(g, mat); m.castShadow = true; m.receiveShadow = true; return m;
+  }
+  function tri(a,b,c, mat){
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+      a.x,a.y,a.z, b.x,b.y,b.z, c.x,c.y,c.z ]), 3));
+    g.computeVertexNormals();
+    const m = new THREE.Mesh(g, mat); m.castShadow = true; m.receiveShadow = true; return m;
+  }
+  const lerp = (a,b,t) => a.clone().lerp(b,t);
+
+  function stripedWall(parent, bA, bB, tA, tB, n){
+    for (let i=0;i<n;i++){
+      const t0=i/n, t1=(i+1)/n;
+      const b0=lerp(bA,bB,t0), b1=lerp(bA,bB,t1), p0=lerp(tA,tB,t0), p1=lerp(tA,tB,t1);
+      const mat = (i%2===0) ? redMat : whiteMat;
+      parent.add(quad(b0,b1,p1,p0, mat));
+      const apex = lerp(p0,p1,0.5); apex.y += CROWN;      // crown point
+      parent.add(tri(p0,p1,apex, mat));
+    }
+  }
+
+  function buildBucket(){
+    bucketGroup.clear();
+
+    // 8 corners of the tapered box
+    const BFL=V(-BOT,0, BOT), BFR=V(BOT,0, BOT), BBR=V(BOT,0,-BOT), BBL=V(-BOT,0,-BOT);
+    const TFL=V(-TOP,H, TOP), TFR=V(TOP,H, TOP), TBR=V(TOP,H,-TOP), TBL=V(-TOP,H,-TOP);
+
+    // three striped walls: right (+x), back (-z), left (-x)
+    stripedWall(bucketGroup, BFR, BBR, TFR, TBR, P.stripes);
+    stripedWall(bucketGroup, BBR, BBL, TBR, TBL, P.stripes);
+    stripedWall(bucketGroup, BBL, BFL, TBL, TFL, P.stripes);
+
+    // solid red front (+z) with a red crown
+    bucketGroup.add(quad(BFL, BFR, TFR, TFL, redMat));
+    { const n=P.stripes;
+      for (let i=0;i<n;i++){ const t0=i/n,t1=(i+1)/n;
+        const p0=lerp(TFL,TFR,t0), p1=lerp(TFL,TFR,t1), apex=lerp(p0,p1,0.5); apex.y+=CROWN;
+        bucketGroup.add(tri(p0,p1,apex, redMat)); }
+    }
+
+    // thin inner floor so you don't see through
+    bucketGroup.add(quad(V(-BOT,0.02,BOT),V(BOT,0.02,BOT),V(BOT,0.02,-BOT),V(-BOT,0.02,-BOT), redMat));
+
+    // ── door on the front (solid red) wall ──
+    const bc = V(0,0,BOT), tc = V(0,H,TOP);
+    const up = tc.clone().sub(bc).normalize();
+    const right = V(1,0,0);
+    const normal = right.clone().cross(up).normalize();
+    const doorW = 0.78, doorH = 1.55;
+    const door = new THREE.Group();
+    const basis = new THREE.Matrix4().makeBasis(right, up, normal);
+    door.quaternion.setFromRotationMatrix(basis);
+    door.position.copy(bc).addScaledVector(up, doorH/2 + 0.04).addScaledVector(normal, 0.02);
+    // frame, panel, knob (local plane: x=right, y=up, +z=out)
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(doorW+0.16, doorH+0.16, 0.06), frameMat);
+    frame.castShadow = true; door.add(frame);
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(doorW, doorH, 0.06), doorMat);
+    panel.position.z = 0.05; panel.castShadow = true; door.add(panel);
+    const knob = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 12), knobMat);
+    knob.position.set(doorW/2 - 0.14, 0, 0.12); door.add(knob);
+    bucketGroup.add(door);
+
+    bucketGroup.scale.setScalar(P.size);
+  }
+
+  // seeded RNG for stable popcorn
+  function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a);
+    t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+
+  function buildPopcorn(){
+    popGroup.clear();
+    const rng = mulberry32(20260715);
+    const count = Math.round(120 + P.amount*180);
+    const kernelGeo = new THREE.IcosahedronGeometry(1, 1);
+
+    // thin popcorn-colored false floor: a SQUARE slab (covers the corners) hidden under the kernels
+    const yFloor = H*0.28;
+    const hwFloor = (BOT + (TOP-BOT)*(yFloor/H)) * 0.95;
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(hwFloor*2, 0.08, hwFloor*2), popMat);
+    floor.position.y = yFloor; floor.receiveShadow = true; popGroup.add(floor);
+
+    const yLow = H*0.26, yTop = H + 0.4;             // pile kernels from deep in the bucket to the brim
+    for (let i=0;i<count;i++){
+      const floating = i >= count-5;                 // last few pop out above
+      let cx, cy, cz, fit = 1;
+      if (floating){
+        const r = TOP*0.6*Math.sqrt(rng()), a = rng()*Math.PI*2;
+        cx = Math.cos(a)*r; cz = Math.sin(a)*r; cy = H + 0.5 + rng()*0.9;
+      } else {
+        cy = yLow + rng()*(yTop - yLow);
+        const wallHalf = BOT + (TOP-BOT)*(cy/H);       // wall half-width at this height
+        const hw = wallHalf - 0.12;                    // centers stay just inside the walls
+        cx = (rng()*2-1)*hw; cz = (rng()*2-1)*hw;      // fill the whole square incl. corners
+        const margin = wallHalf - Math.max(Math.abs(cx), Math.abs(cz));
+        fit = Math.min(1, margin / 0.30);              // shrink pieces near the walls so none poke
+      }
+      const kernel = new THREE.Group();
+      const lobes = 3 + Math.floor(rng()*3);
+      for (let k=0;k<lobes;k++){
+        const s = (0.13 + rng()*0.08) * fit;
+        const m = new THREE.Mesh(kernelGeo, popMat); m.castShadow = true;
+        m.position.set((rng()-0.5)*0.16*fit, (rng()-0.5)*0.16*fit, (rng()-0.5)*0.16*fit);
+        m.scale.setScalar(s * (0.85+rng()*0.3));
+        kernel.add(m);
+      }
+      kernel.position.set(cx, cy, cz);
+      kernel.rotation.set(rng()*6, rng()*6, rng()*6);
+      popGroup.add(kernel);
+    }
+    popGroup.scale.setScalar(P.size);
+  }
+
+  function reframe(){
+    controls.target.set(0, H*P.size*0.55, 0);
+  }
+
+  buildBucket(); buildPopcorn(); reframe();
+  document.getElementById('loading').style.display = 'none';
+
+  // ── editor wiring ──
+  $('pBucket').addEventListener('input', e => redMat.color.set(e.target.value));
+  $('pStripe').addEventListener('input', e => whiteMat.color.set(e.target.value));
+  $('pPop').addEventListener('input',    e => popMat.color.set(e.target.value));
+  $('pDoor').addEventListener('input',   e => doorMat.color.set(e.target.value));
+  $('pStripes').addEventListener('input', e => { P.stripes = +e.target.value; $('vStripes').textContent = e.target.value; buildBucket(); });
+  $('pAmount').addEventListener('input',  e => { P.amount = +e.target.value; $('vAmount').textContent = (+e.target.value).toFixed(2); buildPopcorn(); });
+  $('pSize').addEventListener('input',    e => { P.size = +e.target.value; $('vSize').textContent = (+e.target.value).toFixed(2); bucketGroup.scale.setScalar(P.size); popGroup.scale.setScalar(P.size); reframe(); });
+
+  // ── grab-and-move popcorn pieces ──
+  const draggables = [];
+  const drag = new DragControls(draggables, camera, renderer.domElement);
+  drag.addEventListener('dragstart', () => { controls.enabled = false; });
+  drag.addEventListener('dragend',   () => { controls.enabled = true;  });
+
+  // build one popcorn kernel as a single merged mesh (so it drags as one blob)
+  let kernelSeed = 1;
+  function makeKernelMesh(){
+    const rng = mulberry32(kernelSeed++ * 2654435761);
+    const geos = [];
+    const lobes = 3 + Math.floor(rng()*3);
+    for (let k=0;k<lobes;k++){
+      const g = new THREE.IcosahedronGeometry(1, 1);
+      const s = (0.15 + rng()*0.08) * (0.85 + rng()*0.3);
+      g.scale(s, s, s);
+      g.translate((rng()-0.5)*0.18, (rng()-0.5)*0.18, (rng()-0.5)*0.18);
+      geos.push(g);
+    }
+    const mesh = new THREE.Mesh(mergeGeometries(geos), popMat);
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    return mesh;
+  }
+
+  $('pAdd').onclick = () => {
+    controls.autoRotate = false;                 // stop the spin so it's easy to place
+    const mesh = makeKernelMesh();
+    mesh.scale.setScalar(P.size);
+    mesh.position.set((Math.random()-0.5)*1.6, H*P.size + 0.9, (Math.random()-0.5)*1.6);
+    scene.add(mesh);
+    draggables.push(mesh);
+  };
+
+  // ── loop ──
+  function animate(){ requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
+  animate();
+  addEventListener('resize', ()=>{
+    camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+  </script>
+</body>
+</html>
