@@ -52,10 +52,10 @@
     <p class="sub">Your building — with a door on the red side.</p>
 
     <div class="grp">Colors</div>
-    <div class="crow"><span>Bucket (red)</span><input id="pBucket" type="color" value="#e23b2e" /></div>
+    <div class="crow"><span>Bucket (red)</span><input id="pBucket" type="color" value="#cf1507" /></div>
     <div class="crow"><span>Stripes</span><input id="pStripe" type="color" value="#f4f4f2" /></div>
-    <div class="crow"><span>Popcorn</span><input id="pPop" type="color" value="#f5e6b8" /></div>
-    <div class="crow"><span>Door</span><input id="pDoor" type="color" value="#8f2d24" /></div>
+    <div class="crow"><span>Popcorn</span><input id="pPop" type="color" value="#e0b329" /></div>
+    <div class="crow"><span>Door</span><input id="pDoor" type="color" value="#fb5656" /></div>
 
     <div class="grp">Shape</div>
     <div class="row"><label>Stripes <span id="vStripes">7</span></label>
@@ -126,10 +126,10 @@
   gridRing.rotation.x = -Math.PI/2; gridRing.position.y = 0.01; scene.add(gridRing);
 
   // ── shared materials ──
-  const redMat   = new THREE.MeshStandardMaterial({ color: 0xe23b2e, roughness: 0.7, metalness: 0, side: THREE.DoubleSide });
+  const redMat   = new THREE.MeshStandardMaterial({ color: 0xcf1507, roughness: 0.7, metalness: 0, side: THREE.DoubleSide });
   const whiteMat = new THREE.MeshStandardMaterial({ color: 0xf4f4f2, roughness: 0.7, metalness: 0, side: THREE.DoubleSide });
-  const popMat   = new THREE.MeshStandardMaterial({ color: 0xf5e6b8, roughness: 0.85, metalness: 0, flatShading: true });
-  const doorMat  = new THREE.MeshStandardMaterial({ color: 0x8f2d24, roughness: 0.6, metalness: 0.05 });
+  const popMat   = new THREE.MeshStandardMaterial({ color: 0xe0b329, roughness: 0.85, metalness: 0, flatShading: true });
+  const doorMat  = new THREE.MeshStandardMaterial({ color: 0xfb5656, roughness: 0.6, metalness: 0.05 });
   const frameMat = new THREE.MeshStandardMaterial({ color: 0xf4e3b0, roughness: 0.6, metalness: 0.05 });
   const knobMat  = new THREE.MeshStandardMaterial({ color: 0xffcf5a, roughness: 0.3, metalness: 0.5 });
 
