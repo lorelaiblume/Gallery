@@ -6,7 +6,7 @@
   <title>Roam — Lorelai Blume</title>
   <style>
     :root { color-scheme: dark; }
-    html, body { margin: 0; height: 100%; overflow: hidden; background: #f6d7ec;
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #f05080;
                  font-family: -apple-system, Segoe UI, Karla, sans-serif; }
     #app { position: fixed; inset: 0; }
     canvas { display: block; }
@@ -47,9 +47,9 @@
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   document.getElementById('app').appendChild(renderer.domElement);
 
+  const PINK = 0xf05080;
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xf6d7ec);
-  scene.fog = new THREE.Fog(0xf6d7ec, 60, 220);
+  scene.background = new THREE.Color(PINK);   // solid flat pink — no sky, no ombre
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 
@@ -64,11 +64,35 @@
   sun.shadow.camera.left=-70; sun.shadow.camera.right=70; sun.shadow.camera.top=70; sun.shadow.camera.bottom=-70;
   sun.shadow.bias = -0.0004; scene.add(sun);
 
-  // ── big pink plane ──
+  // ── big pink plane (flat/unlit so it's exactly PINK and seamless with the background) ──
   const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(500, 500),
-    new THREE.MeshStandardMaterial({ color: 0xf3a9d3, roughness: 0.95 }));
-  ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; scene.add(ground);
+    new THREE.PlaneGeometry(600, 600),
+    new THREE.MeshBasicMaterial({ color: PINK }));
+  ground.rotation.x = -Math.PI/2; scene.add(ground);
+
+  // soft contact shadow only (keeps the flat look but grounds the dog)
+  const shadowCatcher = new THREE.Mesh(
+    new THREE.PlaneGeometry(600, 600),
+    new THREE.ShadowMaterial({ opacity: 0.13 }));
+  shadowCatcher.rotation.x = -Math.PI/2; shadowCatcher.position.y = 0.08;
+  shadowCatcher.receiveShadow = true; scene.add(shadowCatcher);
+
+  // ── rainbow road (walk on a rainbow) ──
+  // A straight ROYGBIV road running along the walk axis, centered under the dog.
+  (function buildRainbowRoad(){
+    const LANES = [0xff5a5a, 0xffa24b, 0xffe14b, 0x8fe36b, 0x5ac8ff, 0x7a7bff, 0xc46bff]; // R O Y G B I V
+    const L = 520, laneW = 3.4, totalW = laneW * LANES.length;
+    const road = new THREE.Group();
+    LANES.forEach((hex, i) => {
+      const lane = new THREE.Mesh(
+        new THREE.PlaneGeometry(laneW, L),
+        new THREE.MeshBasicMaterial({ color: hex }));
+      lane.rotation.x = -Math.PI/2;
+      lane.position.set(-totalW/2 + laneW*(i + 0.5), 0.06, 0);
+      road.add(lane);
+    });
+    scene.add(road);
+  })();
 
   // ================= dog =================
   const dogRig = new THREE.Group();   // yaw + position live here
@@ -208,11 +232,11 @@
 
     // fixed-angle follow camera: tracks the dog's position but NOT its heading,
     // so the dog can freely turn around (faces you coming toward the camera, turns away going off)
-    const cx = dogRig.position.x + camDist*0.34;
-    const cz = dogRig.position.z + camDist*0.92;
-    const cy = dogRig.position.y + camDist*0.5;
+    const cx = dogRig.position.x + camDist*0.30;
+    const cz = dogRig.position.z + camDist*0.78;
+    const cy = dogRig.position.y + camDist*0.70;   // elevated but less steep
     camera.position.lerp(new THREE.Vector3(cx, cy, cz), 0.12);
-    camera.lookAt(dogRig.position.x, dogRig.position.y + 1.6, dogRig.position.z);
+    camera.lookAt(dogRig.position.x, dogRig.position.y + 1.2, dogRig.position.z);
 
     renderer.render(scene, camera);
   }
