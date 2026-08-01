@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Roam — Lorelai Blume</title>
+  <style>
+    :root { color-scheme: dark; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #f6d7ec;
+                 font-family: -apple-system, Segoe UI, Karla, sans-serif; }
+    #app { position: fixed; inset: 0; }
+    canvas { display: block; }
+    #loading { position: fixed; inset: 0; display: grid; place-items: center; z-index: 20;
+               font-size: 14px; color: #a24b7d; }
+    .caption { position: fixed; left: 50%; top: 18px; transform: translateX(-50%);
+      z-index: 10; color: #a24b7d; font-size: 13px; letter-spacing: .03em; background: rgba(255,255,255,0.5);
+      padding: 6px 14px; border-radius: 20px; }
+    .home { position: fixed; left: 16px; bottom: 14px; z-index: 20;
+      color: #b56a95; text-decoration: none; font-size: 0.72rem;
+      letter-spacing: 0.18em; text-transform: uppercase; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="loading">Waking up the dog…</div>
+  <div class="caption">WASD / arrow keys to walk · scroll to zoom</div>
+  <a class="home" href="/">← Lorelai Blume</a>
+
+  <script type="importmap">
+  { "imports": {
+      "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/"
+  } }
+  </script>
+  <script type="module">
+  import * as THREE from 'three';
+  import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+  import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+  // ── renderer / scene ──
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.1;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  document.getElementById('app').appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xf6d7ec);
+  scene.fog = new THREE.Fog(0xf6d7ec, 60, 220);
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+  const camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.1, 600);
+  camera.position.set(0, 8, 14);
+
+  scene.add(new THREE.HemisphereLight(0xffffff, 0xe7b9d6, 0.9));
+  const sun = new THREE.DirectionalLight(0xfff4ea, 1.25);
+  sun.position.set(30, 50, 20); sun.castShadow = true;
+  sun.shadow.mapSize.set(2048,2048);
+  sun.shadow.camera.near = 5; sun.shadow.camera.far = 200;
+  sun.shadow.camera.left=-70; sun.shadow.camera.right=70; sun.shadow.camera.top=70; sun.shadow.camera.bottom=-70;
+  sun.shadow.bias = -0.0004; scene.add(sun);
+
+  // ── big pink plane ──
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(500, 500),
+    new THREE.MeshStandardMaterial({ color: 0xf3a9d3, roughness: 0.95 }));
+  ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; scene.add(ground);
+
+  // ================= dog =================
+  const dogRig = new THREE.Group();   // yaw + position live here
+  const model  = new THREE.Group();   // holds the mesh (face offset + scale)
+  dogRig.add(model); scene.add(dogRig);
+
+  const FACE = Math.PI;               // spin the model so its head points forward (flip to 0 if it moonwalks)
+  const TARGET_H = 3.2;
+
+  let dogMesh = null;
+  const dogMat = new THREE.MeshStandardMaterial({ color: 0xef5aa8, roughness: 0.35, metalness: 0.05 });
+
+  // ---- Loop subdivision (one pass, for a smoother dog) ----
+  function weldGeo(geo){
+    const p = geo.getAttribute('position').array;
+    const index = geo.index ? geo.index.array : null;
+    const map = new Map(), wpos = [], wid = new Int32Array(p.length/3), q = 1e4;
+    for (let i=0;i<p.length/3;i++){
+      const k = Math.round(p[i*3]*q)+"_"+Math.round(p[i*3+1]*q)+"_"+Math.round(p[i*3+2]*q);
+      let id = map.get(k);
+      if (id===undefined){ id = wpos.length/3; map.set(k,id); wpos.push(p[i*3],p[i*3+1],p[i*3+2]); }
+      wid[i] = id;
+    }
+    let idx;
+    if (index){ idx = new Uint32Array(index.length); for (let i=0;i<index.length;i++) idx[i]=wid[index[i]]; }
+    else { idx = new Uint32Array(p.length/3); for (let i=0;i<idx.length;i++) idx[i]=wid[i]; }
+    return { pos:new Float32Array(wpos), idx };
+  }
+  function loopSubdivide({pos,idx}){
+    const NV=pos.length/3, NF=idx.length/3, ekey=(a,b)=>(a<b?a:b)*NV+(a<b?b:a);
+    const edges=new Map(), neigh=Array.from({length:NV},()=>new Set());
+    for(let f=0;f<NF;f++){const a=idx[f*3],b=idx[f*3+1],c=idx[f*3+2];
+      for(const [u,v,w] of [[a,b,c],[b,c,a],[c,a,b]]){ const k=ekey(u,v); let e=edges.get(k);
+        if(!e){e={a:u<v?u:v,b:u<v?v:u,opp:[],cnt:0};edges.set(k,e);} e.opp.push(w); e.cnt++; neigh[u].add(v); neigh[v].add(u); } }
+    const ep=new Map(), np=Array.from(pos); let next=NV;
+    for(const [k,e] of edges){ const a=e.a,b=e.b; let x,y,z;
+      if(e.cnt===2){const c=e.opp[0],d=e.opp[1];
+        x=3/8*(pos[a*3]+pos[b*3])+1/8*(pos[c*3]+pos[d*3]); y=3/8*(pos[a*3+1]+pos[b*3+1])+1/8*(pos[c*3+1]+pos[d*3+1]); z=3/8*(pos[a*3+2]+pos[b*3+2])+1/8*(pos[c*3+2]+pos[d*3+2]);
+      } else { x=(pos[a*3]+pos[b*3])/2; y=(pos[a*3+1]+pos[b*3+1])/2; z=(pos[a*3+2]+pos[b*3+2])/2; }
+      ep.set(k,next); np.push(x,y,z); next++; }
+    const bound=new Uint8Array(NV); for(const [,e] of edges) if(e.cnt===1){bound[e.a]=1;bound[e.b]=1;}
+    for(let v=0;v<NV;v++){ const nb=[...neigh[v]],n=nb.length; if(bound[v]||n===0) continue;
+      const beta=(1/n)*(5/8-Math.pow(3/8+1/4*Math.cos(2*Math.PI/n),2)); let sx=0,sy=0,sz=0;
+      for(const u of nb){sx+=pos[u*3];sy+=pos[u*3+1];sz+=pos[u*3+2];}
+      np[v*3]=(1-n*beta)*pos[v*3]+beta*sx; np[v*3+1]=(1-n*beta)*pos[v*3+1]+beta*sy; np[v*3+2]=(1-n*beta)*pos[v*3+2]+beta*sz; }
+    const ni=[]; for(let f=0;f<NF;f++){const a=idx[f*3],b=idx[f*3+1],c=idx[f*3+2];
+      const ab=ep.get(ekey(a,b)),bc=ep.get(ekey(b,c)),ca=ep.get(ekey(c,a)); ni.push(a,ab,ca, ab,b,bc, ca,bc,c, ab,bc,ca); }
+    return { pos:new Float32Array(np), idx:new Uint32Array(ni) };
+  }
+  function makeGeometry({pos,idx}){
+    const g=new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos,3));
+    g.setIndex(new THREE.BufferAttribute(idx,1));
+    g.computeVertexNormals(); g.computeBoundingBox(); g.computeBoundingSphere();
+    return g;
+  }
+
+  // ---- walk (leg swing) ----
+  let restPos=null, legId=null, legW=null, hips=null, walkT=0, walking=false;
+  const LEG_PHASE=[0,Math.PI,Math.PI,0], SWING=0.55;
+  function computeLegData(){
+    const p=dogMesh.geometry.getAttribute('position').array, N=p.length/3;
+    restPos=Float32Array.from(p);
+    let mnx=1e9,mxx=-1e9,mny=1e9,mxy=-1e9,mnz=1e9,mxz=-1e9;
+    for(let i=0;i<N;i++){const x=p[i*3],y=p[i*3+1],z=p[i*3+2]; if(x<mnx)mnx=x;if(x>mxx)mxx=x;if(y<mny)mny=y;if(y>mxy)mxy=y;if(z<mnz)mnz=z;if(z>mxz)mxz=z;}
+    const midX=(mnx+mxx)/2, midZ=(mnz+mxz)/2, thr=mny+(mxy-mny)*0.42;
+    legId=new Int8Array(N).fill(-1); legW=new Float32Array(N);
+    const sx=[0,0,0,0],sz=[0,0,0,0],cnt=[0,0,0,0];
+    for(let i=0;i<N;i++){const y=p[i*3+1]; if(y>=thr)continue;
+      const f=p[i*3+2]<midZ?0:1, l=p[i*3]<midX?0:1, id=f*2+l;
+      legId[i]=id; legW[i]=(thr-y)/(thr-mny); sx[id]+=p[i*3]; sz[id]+=p[i*3+2]; cnt[id]++; }
+    hips=[]; for(let k=0;k<4;k++) hips.push({x:cnt[k]?sx[k]/cnt[k]:0, y:thr, z:cnt[k]?sz[k]/cnt[k]:0});
+  }
+  function restoreRest(){ if(!restPos) return; const a=dogMesh.geometry.getAttribute('position'); a.array.set(restPos); a.needsUpdate=true; }
+  function deformWalk(){
+    const a=dogMesh.geometry.getAttribute('position'), p=a.array, N=p.length/3;
+    for(let i=0;i<N;i++){ const id=legId[i]; if(id<0) continue;
+      const th=SWING*legW[i]*Math.sin(walkT+LEG_PHASE[id]), h=hips[id];
+      const ry=restPos[i*3+1]-h.y, rz=restPos[i*3+2]-h.z, c=Math.cos(th), s=Math.sin(th);
+      p[i*3]=restPos[i*3]; p[i*3+1]=h.y+ry*c-rz*s; p[i*3+2]=h.z+ry*s+rz*c; }
+    a.needsUpdate=true;
+  }
+
+  new GLTFLoader().load('../editors/dog.glb', (gltf) => {
+    const root = gltf.scene;
+    root.traverse(o => { if (o.isMesh) dogMesh = o; });
+    // smooth once
+    const lv0 = weldGeo(dogMesh.geometry);
+    dogMesh.geometry = makeGeometry(loopSubdivide(lv0));
+    dogMesh.material = dogMat;
+    dogMesh.castShadow = true;
+
+    // seat: center x/z, feet at y=0 (local)
+    const geo = dogMesh.geometry; geo.computeBoundingBox();
+    const bb = geo.boundingBox, size = new THREE.Vector3(), c = new THREE.Vector3();
+    bb.getSize(size); bb.getCenter(c);
+    dogMesh.position.set(-c.x, -bb.min.y, -c.z);
+    model.add(dogMesh);
+    model.scale.setScalar(TARGET_H / size.y);
+    model.rotation.y = FACE;
+
+    computeLegData();
+    document.getElementById('loading').style.display = 'none';
+  });
+
+  // ================= controls =================
+  const keys = {};
+  addEventListener('keydown', e => { keys[e.code]=true; if(e.code.startsWith('Arrow')) e.preventDefault(); });
+  addEventListener('keyup',   e => { keys[e.code]=false; });
+  let camDist = 14;
+  addEventListener('wheel', e => { camDist = Math.max(7, Math.min(40, camDist + e.deltaY*0.02)); }, {passive:true});
+
+  let heading = 0;
+  const MOVE = 11, TURN = 2.3;
+  const clock = new THREE.Clock();
+
+  function animate(){
+    requestAnimationFrame(animate);
+    const dt = Math.min(0.05, clock.getDelta());
+
+    let move = 0, turn = 0;
+    if (keys.KeyW || keys.ArrowUp)   move += 1;
+    if (keys.KeyS || keys.ArrowDown) move -= 1;
+    if (keys.KeyA || keys.ArrowLeft) turn += 1;
+    if (keys.KeyD || keys.ArrowRight) turn -= 1;
+
+    heading += turn * TURN * dt;
+    dogRig.rotation.y = heading;
+    dogRig.position.x += Math.sin(heading) * MOVE * move * dt;
+    dogRig.position.z += Math.cos(heading) * MOVE * move * dt;
+
+    if (dogMesh){
+      walking = move !== 0;
+      if (walking){ walkT += dt * 9; deformWalk(); }
+      else if (restPos){ restoreRest(); }
+    }
+
+    // fixed-angle follow camera: tracks the dog's position but NOT its heading,
+    // so the dog can freely turn around (faces you coming toward the camera, turns away going off)
+    const cx = dogRig.position.x + camDist*0.34;
+    const cz = dogRig.position.z + camDist*0.92;
+    const cy = dogRig.position.y + camDist*0.5;
+    camera.position.lerp(new THREE.Vector3(cx, cy, cz), 0.12);
+    camera.lookAt(dogRig.position.x, dogRig.position.y + 1.6, dogRig.position.z);
+
+    renderer.render(scene, camera);
+  }
+  animate();
+  addEventListener('resize', ()=>{
+    camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+  </script>
+</body>
+</html>

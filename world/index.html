@@ -201,11 +201,14 @@
   const visited = new Uint8Array(nV);
   function floodFill(seed){
     visited.fill(0); hh.length=0; hv.length=0;
-    hpush(positions[seed*3+1], seed); visited[seed]=1;
-    let spill = Infinity; const basin=[];
+    const seedH = positions[seed*3+1];
+    hpush(seedH, seed); visited[seed]=1;
+    let level = seedH, spill = Infinity; const basin=[];
     while(hh.length){
       const [h,v]=hpop();
-      if (isEdge[v]){ spill=h; break; }     // water would drain off the island here
+      if (h < level - 1e-4){ spill = level; break; }   // reached a lower outlet: water escapes at `level`
+      level = h;                                        // water has risen to this height
+      if (isEdge[v]){ spill = level; break; }           // drains off the island
       basin.push(v);
       for (const nb of nbrs(v)) if(!visited[nb]){ visited[nb]=1; hpush(positions[nb*3+1], nb); }
     }
