@@ -67,6 +67,7 @@ let unsubscribe = null;
 
 navBtns.forEach(btn => {
   btn.addEventListener('click', () => {
+    if (btn.tagName === 'A') return;   // Editors / World are plain links — let them navigate
     navBtns.forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     currentCategory = btn.dataset.category;

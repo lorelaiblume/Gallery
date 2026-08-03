@@ -51,6 +51,8 @@ nav {
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
+  display: inline-block;
+  text-decoration: none;
   padding: 12px 24px;
   font-family: 'Cormorant Garamond', Georgia, serif;
   font-size: 0.75rem;
