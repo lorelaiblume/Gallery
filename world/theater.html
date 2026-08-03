@@ -151,7 +151,7 @@
       const tile = document.createElement('button'); tile.className = 'tile';
       const v = document.createElement('video');
       v.className = 'thumb'; v.src = f.url; v.muted = true; v.playsInline = true; v.preload = 'metadata';
-      v.addEventListener('loadeddata', () => { try { v.currentTime = 0.1; } catch (e) {} });
+      v.addEventListener('loadedmetadata', () => { try { v.currentTime = 1; } catch (e) {} });   // same as app.js Film tab
       const name = document.createElement('span'); name.className = 'tname'; name.textContent = f.title || 'Untitled';
       tile.append(v, name);
       tile.addEventListener('click', () => play(f));
