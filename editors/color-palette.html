@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Color Palette — Lorelai Blume</title>
+  <style>
+    :root { color-scheme: dark; }
+    html, body { margin: 0; height: 100%; background: #0a0d14; color: #eef1f6;
+                 font-family: -apple-system, Segoe UI, Karla, sans-serif; overflow: hidden; }
+    #app { position: fixed; inset: 0; }
+    canvas { display: block; }
+    #loading { position: fixed; inset: 0; display: grid; place-items: center; z-index: 20;
+               font-size: 14px; color: #9fb4d8; }
+    .caption { position: fixed; left: 50%; top: 18px; transform: translateX(-50%);
+      z-index: 10; color: #9fb4d8; font-size: 12px; letter-spacing: .04em; }
+    .home { position: fixed; left: 16px; bottom: 14px; z-index: 20;
+      color: #7c8296; text-decoration: none; font-size: 0.72rem;
+      letter-spacing: 0.18em; text-transform: uppercase; transition: color .2s; }
+    .home:hover { color: #f5a3d3; }
+    #panel {
+      position: fixed; top: 16px; left: 16px; width: 244px; padding: 15px 17px;
+      background: rgba(16,21,31,0.86); backdrop-filter: blur(8px);
+      border: 1px solid #2a3242; border-radius: 14px; z-index: 10; user-select: none;
+      max-height: calc(100vh - 32px); overflow-y: auto;
+    }
+    #panel h1 { font-size: 15px; margin: 0 0 2px; }
+    #panel .sub { font-size: 12px; color: #9fb4d8; margin: 0 0 12px; }
+    .grp { font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+           color: #6b7890; margin: 15px 0 7px; }
+    .crow { display:flex; align-items:center; justify-content:space-between; font-size:12px;
+            color:#b9c4d8; margin:8px 0; }
+    .crow input[type=color] { width: 42px; height: 26px; border: none; background: none; padding: 0; cursor: pointer; }
+    .btn2 { display:block; width:100%; margin:12px 0 4px; padding:9px; font-size:13px; cursor:pointer;
+            background:#1c2432; color:#b9c4d8; border:1px solid #2f3a4d; border-radius:8px; }
+    .btn2:hover { border-color:#f5a3d3; color:#f5a3d3; }
+    .hint2 { font-size:11px; color:#6b7890; line-height:1.5; margin:2px 0 0; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="loading">Mixing the paints…</div>
+  <div class="caption">drag to spin · scroll to zoom</div>
+  <a class="home" href="/">← Lorelai Blume</a>
+
+  <div id="panel">
+    <h1>🎨 Color Palette</h1>
+    <p class="sub">Recolor the paints, board &amp; brush — live.</p>
+    <div class="grp">Paints</div>
+    <div id="paints"></div>
+    <div class="grp">Palette board</div>
+    <div id="props"></div>
+    <button class="btn2" id="save">💾 Save colors</button>
+    <button class="btn2" id="reset">Reset colors</button>
+    <p class="hint2">Save keeps your colors when you reload.</p>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module">
+  import * as THREE from 'three';
+  import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+  import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+  import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+  const $ = id => document.getElementById(id);
+
+  // ── renderer / scene / camera ──
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  document.getElementById('app').appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0e131d);
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+  const camera = new THREE.PerspectiveCamera(42, innerWidth/innerHeight, 0.01, 500);
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true; controls.dampingFactor = 0.08;
+  controls.autoRotate = true; controls.autoRotateSpeed = 0.7;
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+  const key = new THREE.DirectionalLight(0xffffff, 1.15);
+  key.position.set(6, 12, 7); key.castShadow = true;
+  key.shadow.mapSize.set(2048,2048);
+  key.shadow.camera.near = 0.5; key.shadow.camera.far = 60;
+  key.shadow.camera.left = -14; key.shadow.camera.right = 14;
+  key.shadow.camera.top = 14; key.shadow.camera.bottom = -14;
+  key.shadow.bias = -0.0004; scene.add(key);
+  const fill = new THREE.DirectionalLight(0xa9c6ff, 0.3); fill.position.set(-6, 4, -6); scene.add(fill);
+
+  const ground = new THREE.Mesh(new THREE.CircleGeometry(60, 60),
+                  new THREE.MeshStandardMaterial({ color: 0x141a26, roughness: 1 }));
+  ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; scene.add(ground);
+
+  // ── labels for the model's materials ──
+  const PAINTS = [
+    { name: 'Material.002', label: 'Red' },
+    { name: 'Material.005', label: 'Pink' },
+    { name: 'Material.004', label: 'Yellow' },
+    { name: 'Material.006', label: 'Green' },
+    { name: 'Material.007', label: 'Blue' },
+    { name: 'Material.003', label: 'Purple' },
+  ];
+  const PROPS = [
+    { name: 'palitra', label: 'Palette board' },
+  ];
+
+  const mats = {};        // name -> THREE material
+  const originals = {};   // name -> original hex (for Reset)
+  const STORAGE = 'lorelai-palette-colors';
+  const ALL = [...PAINTS, ...PROPS].map(p => p.name);
+  const loadSaved = () => { try { return JSON.parse(localStorage.getItem(STORAGE) || '{}'); } catch { return {}; } };
+
+  new GLTFLoader().load('color-palette.glb', (gltf) => {
+    const root = gltf.scene;
+    const brush = root.getObjectByName('brush'); if (brush) brush.visible = false;   // no paintbrush
+    root.traverse(o => {
+      if (o.isMesh){
+        o.castShadow = true; o.receiveShadow = true;
+        const list = Array.isArray(o.material) ? o.material : [o.material];
+        list.forEach(m => { if (m && m.name){
+          mats[m.name] = m; if ((m.metalness||0) > 0.1) m.metalness = 0.1;
+          if (!(m.name in originals)) originals[m.name] = '#' + m.color.getHexString();
+        } });
+      }
+    });
+
+    // re-apply any colors you saved last time
+    const saved = loadSaved();
+    for (const [name, hex] of Object.entries(saved)) if (mats[name]) mats[name].color.set(hex);
+
+    // seat on the ground, center + frame the camera
+    const box = new THREE.Box3().setFromObject(root);
+    const size = new THREE.Vector3(); box.getSize(size);
+    const center = new THREE.Vector3(); box.getCenter(center);
+    root.position.y -= box.min.y;
+    center.y -= box.min.y;
+    scene.add(root);
+
+    const radius = Math.max(size.x, size.y, size.z);
+    controls.target.copy(center);
+    camera.position.set(center.x + radius*1.6, center.y + radius*1.1, center.z + radius*2.0);
+    controls.update();
+
+    buildPickers();
+    document.getElementById('loading').style.display = 'none';
+  });
+
+  // ── build the color pickers from the loaded materials ──
+  function row(parent, part){
+    const m = mats[part.name]; if (!m) return;
+    const wrap = document.createElement('div'); wrap.className = 'crow';
+    const span = document.createElement('span'); span.textContent = part.label;
+    const input = document.createElement('input'); input.type = 'color'; input.value = '#' + m.color.getHexString();
+    input.addEventListener('input', e => m.color.set(e.target.value));
+    wrap.append(span, input); parent.appendChild(wrap);
+  }
+  function buildPickers(){
+    PAINTS.forEach(p => row($('paints'), p));
+    PROPS.forEach(p => row($('props'), p));
+  }
+  function syncInputs(){
+    document.querySelectorAll('#panel input[type=color]').forEach((inp, i) => {
+      const name = ALL[i]; if (name && mats[name]) inp.value = '#' + mats[name].color.getHexString();
+    });
+  }
+
+  // save your colors so they reload next time
+  $('save').onclick = () => {
+    const data = {};
+    for (const name of ALL) if (mats[name]) data[name] = '#' + mats[name].color.getHexString();
+    localStorage.setItem(STORAGE, JSON.stringify(data));
+    const b = $('save'), t = b.textContent; b.textContent = '✓ Saved'; setTimeout(() => b.textContent = t, 1200);
+  };
+  $('reset').onclick = () => {
+    for (const [name, hex] of Object.entries(originals)) if (mats[name]) mats[name].color.set(hex);
+    localStorage.removeItem(STORAGE);
+    syncInputs();
+  };
+
+  // ── loop ──
+  function animate(){ requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
+  animate();
+  addEventListener('resize', ()=>{
+    camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+  </script>
+</body>
+</html>

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lor's Cinema — Lorelai Blume</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Limelight&display=swap" rel="stylesheet">
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: #0b0710; color: #f4e9f0;
+      font-family: -apple-system, Segoe UI, Karla, sans-serif; overflow: hidden; }
+
+    #house { position: fixed; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: flex-start;
+      background: radial-gradient(120% 80% at 50% -10%, #2a0f26 0%, #160a18 45%, #0b0710 100%); }
+
+    /* art-deco marquee sign */
+    .marquee { margin-top: 26px; z-index: 3; display: flex; justify-content: center; }
+    .sign { position: relative; display: inline-flex; padding: 30px; border-radius: 14px;
+      background: linear-gradient(#c62b26, #9c1b18);
+      box-shadow: 0 12px 40px rgba(0,0,0,.55), inset 0 0 0 2px #7c1512; }
+    /* a ring of lit bulbs centered on the red frame band (thickness = padding) */
+    .sign::before { content: ""; position: absolute; inset: 0; border-radius: 14px; pointer-events: none;
+      background-image:
+        radial-gradient(circle, #fffbe6 0 4px, #ffce62 5.5px, rgba(0,0,0,0) 8.5px),   /* top */
+        radial-gradient(circle, #fffbe6 0 4px, #ffce62 5.5px, rgba(0,0,0,0) 8.5px),   /* bottom */
+        radial-gradient(circle, #fffbe6 0 4px, #ffce62 5.5px, rgba(0,0,0,0) 8.5px),   /* left */
+        radial-gradient(circle, #fffbe6 0 4px, #ffce62 5.5px, rgba(0,0,0,0) 8.5px);   /* right */
+      background-repeat: repeat-x, repeat-x, repeat-y, repeat-y;
+      background-position: center top, center bottom, left center, right center;
+      background-size: 30px 30px, 30px 30px, 30px 30px, 30px 30px;
+      filter: drop-shadow(0 0 6px rgba(255,206,98,.95)) drop-shadow(0 0 2px rgba(255,255,255,.7)); }
+    .sign .panel { position: relative; background: #0a0a0d; border-radius: 6px;
+      padding: 14px clamp(28px, 5vw, 62px); box-shadow: inset 0 0 0 2px #24242c; }
+    .sign .panel span { font-family: 'Limelight', Georgia, serif;
+      font-size: clamp(26px, 5vw, 54px); letter-spacing: .09em; color: #f4e3a6;
+      text-transform: uppercase; white-space: nowrap;
+      text-shadow: 0 0 12px rgba(255,220,140,.55), 0 2px 0 #7a5a1e; }
+
+    /* stage + screen */
+    #stage { position: relative; margin-top: 26px; width: min(80vw, 1120px); z-index: 2; }
+    .screen-wrap { position: relative; padding: 14px; border-radius: 12px;
+      background: linear-gradient(#141018, #0d0a12);
+      box-shadow: 0 0 0 2px #3a2340, 0 30px 80px rgba(0,0,0,.6); }
+    .screen { position: relative; aspect-ratio: 16/9; width: 100%; border-radius: 6px; overflow: hidden;
+      background: #08080b; box-shadow: inset 0 0 60px rgba(0,0,0,.7), inset 0 0 0 1px rgba(255,255,255,.04); }
+
+    /* 2x2 grid of rounded squares */
+    .grid { position:absolute; inset:0; display:grid;
+      grid-template-columns: repeat(2, auto); grid-template-rows: repeat(2, 44%);
+      gap: 16px; place-content: center; }
+    .tile { position: relative; aspect-ratio: 1; height: 100%; width: auto; border: none; cursor: pointer;
+      border-radius: clamp(14px, 2vh, 22px); overflow: hidden; background: #16121c; padding: 0;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
+      transition: transform .18s ease, box-shadow .18s ease; }
+    .tile:hover { transform: translateY(-4px) scale(1.02);
+      box-shadow: inset 0 0 0 1px rgba(255,180,220,.3), 0 14px 34px rgba(0,0,0,.5), 0 0 22px rgba(255,140,190,.28); }
+    .tile .thumb { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #000; }
+    .tile .tname { position: absolute; left: 0; right: 0; bottom: 0; padding: 10px 12px; text-align: left;
+      font-size: clamp(12px, 1.7vh, 16px); color: #fff; letter-spacing: .02em; line-height: 1.2;
+      background: linear-gradient(transparent, rgba(0,0,0,.78)); }
+    .grid .msg { grid-column: 1 / -1; align-self: center; justify-self: center; color: #8a7ca0; font-size: 13px; }
+
+    /* player overlay (fills the screen when a film is picked) */
+    .player { position: absolute; inset: 0; background: #000; display: none; place-items: center; z-index: 5; }
+    .player[data-open="1"] { display: grid; }
+    .player #media, .player #media video, .player #media iframe {
+      position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background:#000; object-fit: contain; }
+    .player .close { position: absolute; top: 10px; right: 12px; z-index: 6; width: 34px; height: 34px;
+      border: none; border-radius: 50%; background: rgba(20,16,24,.8); color: #ffd9ef; font-size: 16px;
+      cursor: pointer; box-shadow: 0 0 0 1px rgba(255,255,255,.12); }
+    .player .close:hover { background: rgba(60,30,50,.9); }
+
+    /* full-page velvet curtains: closed on entry, then tie back to the sides */
+    #curtains { position: fixed; inset: 0; z-index: 30; pointer-events: none; }
+    .drape { position: fixed; top: 0; bottom: 0; width: 52%; z-index: 1;
+      background:
+        linear-gradient(180deg, rgba(0,0,0,.42), rgba(0,0,0,0) 16%, rgba(0,0,0,0) 60%, rgba(0,0,0,.4)),
+        repeating-linear-gradient(90deg,
+          #b01d2b 0, #d33a3f 22px, #ec5f57 33px, #d33a3f 45px, #a4192a 66px, #d33a3f 90px, #b01d2b 104px);
+      box-shadow: inset 0 60px 80px rgba(0,0,0,.22), inset 0 -90px 130px rgba(0,0,0,.38);
+      transition: width 1.5s cubic-bezier(.6,0,.15,1), border-radius 1.5s ease; }
+    .drape.l { left: 0; box-shadow: inset -44px 0 70px rgba(0,0,0,.32); }
+    .drape.r { right: 0; box-shadow: inset 44px 0 70px rgba(0,0,0,.32); }
+    #curtains.open .drape.l { width: 16vw; border-radius: 0 0 80% 0 / 0 0 55% 0; }
+    #curtains.open .drape.r { width: 16vw; border-radius: 0 0 0 80% / 0 0 0 55%; }
+
+    .home { position: fixed; left: 18px; bottom: 14px; z-index: 40;
+      color: #ffe9c2; text-decoration: none; font-size: 0.72rem;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      text-shadow: 0 1px 5px rgba(0,0,0,.85), 0 0 2px rgba(0,0,0,.7); }
+    .home:hover { color: #fff; }
+
+    #wipe { position: fixed; inset: 0; background:#fff; z-index: 60; opacity: 1;
+      animation: fadeout 0.9s ease forwards; pointer-events: none; }
+    @keyframes fadeout { to { opacity: 0; } }
+  </style>
+</head>
+<body>
+  <div id="house">
+    <div class="marquee">
+      <div class="sign"><div class="panel"><span>Lor's Cinema</span></div></div>
+    </div>
+
+    <div id="stage">
+      <div class="screen-wrap">
+        <div class="screen" id="screen">
+          <div class="grid" id="grid"></div>
+          <div class="player" id="player">
+            <button class="close" id="close" aria-label="Close">✕</button>
+            <div id="media"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <a class="home" href="roam.html">← back to the world</a>
+
+  <div id="curtains">
+    <div class="drape l"></div>
+    <div class="drape r"></div>
+  </div>
+  <div id="wipe"></div>
+
+  <!-- same Firebase backend as lorelaiblume.com → Film tab -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script>
+  firebase.initializeApp({
+    apiKey: "AIzaSyBqcTGjJDyGk71hrbqo9fQk5Iz82LMuEz0",
+    authDomain: "lorelai-blume-gallery.firebaseapp.com",
+    projectId: "lorelai-blume-gallery",
+    storageBucket: "lorelai-blume-gallery.firebasestorage.app",
+    messagingSenderId: "921923872934",
+    appId: "1:921923872934:web:2177895d7817a267132c67"
+  });
+  const db = firebase.firestore();
+
+  const grid = document.getElementById('grid');
+  const player = document.getElementById('player');
+  const media = document.getElementById('media');
+
+  function render(films){
+    grid.innerHTML = '';
+    if (!films.length){ grid.innerHTML = '<p class="msg">No films yet.</p>'; return; }
+    films.forEach(f => {
+      const tile = document.createElement('button'); tile.className = 'tile';
+      const v = document.createElement('video');
+      v.className = 'thumb'; v.src = f.url; v.muted = true; v.playsInline = true; v.preload = 'metadata';
+      v.addEventListener('loadeddata', () => { try { v.currentTime = 0.1; } catch (e) {} });
+      const name = document.createElement('span'); name.className = 'tname'; name.textContent = f.title || 'Untitled';
+      tile.append(v, name);
+      tile.addEventListener('click', () => play(f));
+      grid.appendChild(tile);
+    });
+  }
+
+  // live, exactly like the site's Film tab
+  db.collection('films').orderBy('createdAt').onSnapshot(
+    snap => render(snap.docs.map(d => d.data())),
+    err => { console.error(err); grid.innerHTML = '<p class="msg">Could not load films.</p>'; }
+  );
+
+  function play(f){
+    media.innerHTML = '';
+    const v = document.createElement('video');
+    v.src = f.url; v.controls = true; v.autoplay = true; v.playsInline = true;
+    media.appendChild(v);
+    player.dataset.open = '1';
+  }
+  document.getElementById('close').addEventListener('click', () => {
+    player.dataset.open = '0'; media.innerHTML = '';   // clearing stops playback
+  });
+
+  // curtains cover the whole page on entry, then draw back 1s after you walk in
+  setTimeout(() => document.getElementById('curtains').classList.add('open'), 1000);
+  </script>
+</body>
+</html>

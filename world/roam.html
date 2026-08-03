@@ -6,7 +6,7 @@
   <title>Roam — Lorelai Blume</title>
   <style>
     :root { color-scheme: dark; }
-    html, body { margin: 0; height: 100%; overflow: hidden; background: #f05080;
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #f9e0ef;
                  font-family: -apple-system, Segoe UI, Karla, sans-serif; }
     #app { position: fixed; inset: 0; }
     canvas { display: block; }
@@ -18,13 +18,16 @@
     .home { position: fixed; left: 16px; bottom: 14px; z-index: 20;
       color: #b56a95; text-decoration: none; font-size: 0.72rem;
       letter-spacing: 0.18em; text-transform: uppercase; }
+    #flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none;
+      transition: opacity 0.8s ease; z-index: 50; }
   </style>
 </head>
 <body>
   <div id="app"></div>
   <div id="loading">Waking up the dog…</div>
-  <div class="caption">WASD / arrow keys to walk · scroll to zoom</div>
+  <div class="caption">WASD / arrow keys to walk · scroll to zoom · V: overview / follow</div>
   <a class="home" href="/">← Lorelai Blume</a>
+  <div id="flash"></div>
 
   <script type="importmap">
   { "imports": {
@@ -47,52 +50,334 @@
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   document.getElementById('app').appendChild(renderer.domElement);
 
-  const PINK = 0xf05080;
+  const PINK = 0xf05080;      // the dish
+  const SPACE = 0xf9e0ef;     // pale-pink empty space around it
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(PINK);   // solid flat pink — no sky, no ombre
+  scene.background = new THREE.Color(SPACE);
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 
-  const camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.1, 600);
+  const camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 3, 2200);
   camera.position.set(0, 8, 14);
 
   scene.add(new THREE.HemisphereLight(0xffffff, 0xe7b9d6, 0.9));
   const sun = new THREE.DirectionalLight(0xfff4ea, 1.25);
   sun.position.set(30, 50, 20); sun.castShadow = true;
-  sun.shadow.mapSize.set(2048,2048);
-  sun.shadow.camera.near = 5; sun.shadow.camera.far = 200;
-  sun.shadow.camera.left=-70; sun.shadow.camera.right=70; sun.shadow.camera.top=70; sun.shadow.camera.bottom=-70;
+  sun.shadow.mapSize.set(4096,4096);
+  sun.shadow.camera.near = 5; sun.shadow.camera.far = 600;
+  sun.shadow.camera.left=-190; sun.shadow.camera.right=190; sun.shadow.camera.top=190; sun.shadow.camera.bottom=-190;
   sun.shadow.bias = -0.0004; scene.add(sun);
 
-  // ── big pink plane (flat/unlit so it's exactly PINK and seamless with the background) ──
-  const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(600, 600),
+  // ── the dish: a small finite pink disk floating in the pale-pink void ──
+  const DISH_R = 150, DISH_TH = 12;
+  const dish = new THREE.Group();
+  const dishTop = new THREE.Mesh(
+    new THREE.CircleGeometry(DISH_R, 96),
     new THREE.MeshBasicMaterial({ color: PINK }));
-  ground.rotation.x = -Math.PI/2; scene.add(ground);
+  dishTop.rotation.x = -Math.PI/2; dish.add(dishTop);
+  const dishSide = new THREE.Mesh(
+    new THREE.CylinderGeometry(DISH_R, DISH_R, DISH_TH, 96, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0xd23f6d, side: THREE.DoubleSide }));  // darker rim = depth
+  dishSide.position.y = -DISH_TH/2; dish.add(dishSide);
+  const dishBottom = new THREE.Mesh(
+    new THREE.CircleGeometry(DISH_R, 96),
+    new THREE.MeshBasicMaterial({ color: 0xc23a64 }));
+  dishBottom.rotation.x = Math.PI/2; dishBottom.position.y = -DISH_TH; dish.add(dishBottom);
+  scene.add(dish);
 
-  // soft contact shadow only (keeps the flat look but grounds the dog)
+  // soft contact shadow on the dish top
   const shadowCatcher = new THREE.Mesh(
-    new THREE.PlaneGeometry(600, 600),
+    new THREE.CircleGeometry(DISH_R, 96),
     new THREE.ShadowMaterial({ opacity: 0.13 }));
-  shadowCatcher.rotation.x = -Math.PI/2; shadowCatcher.position.y = 0.08;
+  shadowCatcher.rotation.x = -Math.PI/2; shadowCatcher.position.y = 0.05;
   shadowCatcher.receiveShadow = true; scene.add(shadowCatcher);
 
-  // ── rainbow road (walk on a rainbow) ──
-  // A straight ROYGBIV road running along the walk axis, centered under the dog.
-  (function buildRainbowRoad(){
-    const LANES = [0xff5a5a, 0xffa24b, 0xffe14b, 0x8fe36b, 0x5ac8ff, 0x7a7bff, 0xc46bff]; // R O Y G B I V
-    const L = 520, laneW = 3.4, totalW = laneW * LANES.length;
-    const road = new THREE.Group();
-    LANES.forEach((hex, i) => {
-      const lane = new THREE.Mesh(
-        new THREE.PlaneGeometry(laneW, L),
-        new THREE.MeshBasicMaterial({ color: hex }));
-      lane.rotation.x = -Math.PI/2;
-      lane.position.set(-totalW/2 + laneW*(i + 0.5), 0.06, 0);
-      road.add(lane);
+  // ── loop path around the edge of the dish (walk around to visit what we place) ──
+  const PATH_R = DISH_R - 24, PATH_W = 28;
+  (function buildLoopPath(){
+    const COLORS = [0x6a86ef, 0x56c5f1, 0xa9e05a, 0xf6b74a, 0xf0794c, 0xef5566]; // periwinkle→red
+    const inner = PATH_R - PATH_W/2, band = PATH_W / COLORS.length;
+    COLORS.forEach((hex, i) => {
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(inner + band*i, inner + band*(i+1), 160),
+        new THREE.MeshBasicMaterial({ color: hex, toneMapped: false }));
+      ring.rotation.x = -Math.PI/2;
+      ring.position.y = 0.12;
+      scene.add(ring);
     });
-    scene.add(road);
   })();
+
+  // ── marker halos (placeholders for what we'll add later) ──
+  // 5 evenly spaced on the rim + 1 in the center. They gently pulse/glow.
+  const halos = [];
+  const HALO_R = DISH_R * 0.055;   // scales with the dish
+  (function buildHalos(){
+    function makeHalo(x, z){
+      const g = new THREE.Group();
+      g.position.set(x, 0.25, z);
+      const core = new THREE.Mesh(
+        new THREE.RingGeometry(HALO_R*0.62, HALO_R, 64),
+        new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9,
+          blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false }));
+      core.rotation.x = -Math.PI/2; g.add(core);
+      const glow = new THREE.Mesh(
+        new THREE.RingGeometry(HALO_R, HALO_R*1.85, 64),
+        new THREE.MeshBasicMaterial({ color: 0xffd9f2, transparent: true, opacity: 0.32,
+          blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false }));
+      glow.rotation.x = -Math.PI/2; g.add(glow);
+      scene.add(g);
+      halos.push({ grp: g, core, glow, phase: Math.random()*Math.PI*2 });
+    }
+    makeHalo(0, 0);                                  // center
+    for (let i = 0; i < 5; i++){                     // evenly spaced on the loop path
+      if (i === 4 || i === 0) continue;               // halos occupied by the popcorn (4) and palette (0)
+      const a = (i/5)*Math.PI*2 - Math.PI/2;         // first one at the top
+      makeHalo(Math.cos(a)*PATH_R, Math.sin(a)*PATH_R);
+    }
+  })();
+
+  // ── rainbow spoke paths: flat, same width as the loop, from center out to each rim halo ──
+  //    inner ends fan onto a circular arc so they wrap cleanly around the center halo,
+  //    and the inner clearing is wide enough that the five spokes never overlap each other.
+  (function buildSpokes(){
+    const COLORS = [0x6a86ef, 0x56c5f1, 0xa9e05a, 0xf6b74a, 0xf0794c, 0xef5566]; // periwinkle→red
+    const W = PATH_W;                     // match the loop path width
+    const INNER = HALO_R * 3.3;           // rounded clearing radius around the center halo
+    const rOuter = PATH_R - HALO_R * 1.9; // stop just short of the rim halo
+    const y = 0.12, SUBU = 4;             // sub-samples per colour band → smooth inner arc
+    function spoke(a){
+      const d = new THREE.Vector3(Math.cos(a), 0, Math.sin(a));
+      const perp = new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0), d).normalize();
+      // inner cap rides the center circle (radius INNER) but keeps the side edges parallel,
+      // so the spoke is a straight constant-width road — no bowtie/hourglass.
+      const innerPt = o => d.clone().multiplyScalar(Math.sqrt(Math.max(0, INNER*INNER - o*o)))
+                            .addScaledVector(perp, o);
+      const outerPt = o => d.clone().multiplyScalar(rOuter).addScaledVector(perp, o);
+      const laneW = W / COLORS.length, pos = [], col = [], tmp = new THREE.Color();
+      for (let k=0;k<COLORS.length;k++){
+        tmp.setHex(COLORS[k]);
+        for (let s=0;s<SUBU;s++){
+          const o0 = -W/2 + (k + s/SUBU)*laneW, o1 = -W/2 + (k + (s+1)/SUBU)*laneW;
+          const i0 = innerPt(o0), i1 = innerPt(o1), q0 = outerPt(o0), q1 = outerPt(o1);
+          pos.push(i0.x,y,i0.z, i1.x,y,i1.z, q1.x,y,q1.z, i0.x,y,i0.z, q1.x,y,q1.z, q0.x,y,q0.z);
+          for (let n=0;n<6;n++) col.push(tmp.r,tmp.g,tmp.b);
+        }
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos),3));
+      g.setAttribute('color',    new THREE.BufferAttribute(new Float32Array(col),3));
+      const mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
+        vertexColors:true, toneMapped:false, side:THREE.DoubleSide }));
+      scene.add(mesh);
+    }
+    for (let i = 0; i < 5; i++){ const a = (i/5)*Math.PI*2 - Math.PI/2; spoke(a); }
+  })();
+
+  // portal state (door swings open near the popcorn; stepping in transports to the theater)
+  let popcornDoor = null, popcornGlow = null, portalTriggered = false;
+  const popcornEntry = new THREE.Vector3(1e9, 0, 1e9);
+  function enterPortal(){
+    const flash = document.getElementById('flash');
+    if (flash) flash.style.opacity = '1';
+    setTimeout(() => { window.location.href = 'theater.html'; }, 800);
+  }
+
+  // palette → gallery portal (step on the glowing blue paint)
+  let galleryTriggered = false, paletteGlow = null, paletteHalo = null, paletteObj = null;
+  const palettePortal = new THREE.Vector3(1e9, 0, 1e9);
+  const downRay = new THREE.Raycaster(), _down = new THREE.Vector3(0,-1,0), _downOrigin = new THREE.Vector3();
+  function enterGallery(){
+    const flash = document.getElementById('flash');
+    if (flash) flash.style.opacity = '1';
+    setTimeout(() => { window.location.href = 'gallery.html'; }, 800);
+  }
+
+  // ── popcorn bucket "building" on the top-left halo (from the popcorn editor, default look) ──
+  (function buildPopcornBucket(){
+    const redMat   = new THREE.MeshStandardMaterial({ color: 0xcf1507, roughness: 0.7, metalness: 0, side: THREE.DoubleSide });
+    const whiteMat = new THREE.MeshStandardMaterial({ color: 0xf4f4f2, roughness: 0.7, metalness: 0, side: THREE.DoubleSide });
+    const popMat   = new THREE.MeshStandardMaterial({ color: 0xe0b329, roughness: 0.85, metalness: 0, flatShading: true });
+    const doorMat  = new THREE.MeshStandardMaterial({ color: 0xfb5656, roughness: 0.6, metalness: 0.05 });
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0xf4e3b0, roughness: 0.6, metalness: 0.05 });
+    const knobMat  = new THREE.MeshStandardMaterial({ color: 0xffcf5a, roughness: 0.3, metalness: 0.5 });
+
+    const STRIPES = 7, AMOUNT = 0.85;               // editor defaults
+    const H = 2.6, BOT = 0.95, TOP = 1.35, CROWN = 0.24;
+
+    const root = new THREE.Group();
+    const bucketGroup = new THREE.Group(), popGroup = new THREE.Group();
+    root.add(bucketGroup, popGroup);
+
+    const V = (x,y,z) => new THREE.Vector3(x,y,z);
+    const lerp = (a,b,t) => a.clone().lerp(b,t);
+    function quad(a,b,c,d, mat){
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+        a.x,a.y,a.z, b.x,b.y,b.z, c.x,c.y,c.z, a.x,a.y,a.z, c.x,c.y,c.z, d.x,d.y,d.z ]), 3));
+      g.computeVertexNormals();
+      const m = new THREE.Mesh(g, mat); m.castShadow = true; m.receiveShadow = true; return m;
+    }
+    function tri(a,b,c, mat){
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+        a.x,a.y,a.z, b.x,b.y,b.z, c.x,c.y,c.z ]), 3));
+      g.computeVertexNormals();
+      const m = new THREE.Mesh(g, mat); m.castShadow = true; m.receiveShadow = true; return m;
+    }
+    function stripedWall(parent, bA, bB, tA, tB, n){
+      for (let i=0;i<n;i++){
+        const t0=i/n, t1=(i+1)/n;
+        const b0=lerp(bA,bB,t0), b1=lerp(bA,bB,t1), p0=lerp(tA,tB,t0), p1=lerp(tA,tB,t1);
+        const mat = (i%2===0) ? redMat : whiteMat;
+        parent.add(quad(b0,b1,p1,p0, mat));
+        const apex = lerp(p0,p1,0.5); apex.y += CROWN;
+        parent.add(tri(p0,p1,apex, mat));
+      }
+    }
+
+    // tapered box corners
+    const BFL=V(-BOT,0, BOT), BFR=V(BOT,0, BOT), BBR=V(BOT,0,-BOT), BBL=V(-BOT,0,-BOT);
+    const TFL=V(-TOP,H, TOP), TFR=V(TOP,H, TOP), TBR=V(TOP,H,-TOP), TBL=V(-TOP,H,-TOP);
+    stripedWall(bucketGroup, BFR, BBR, TFR, TBR, STRIPES);   // right
+    stripedWall(bucketGroup, BBR, BBL, TBR, TBL, STRIPES);   // back
+    stripedWall(bucketGroup, BBL, BFL, TBL, TFL, STRIPES);   // left
+    bucketGroup.add(quad(BFL, BFR, TFR, TFL, redMat));       // solid red front
+    for (let i=0;i<STRIPES;i++){ const t0=i/STRIPES,t1=(i+1)/STRIPES;
+      const p0=lerp(TFL,TFR,t0), p1=lerp(TFL,TFR,t1), apex=lerp(p0,p1,0.5); apex.y+=CROWN;
+      bucketGroup.add(tri(p0,p1,apex, redMat)); }
+    bucketGroup.add(quad(V(-BOT,0.02,BOT),V(BOT,0.02,BOT),V(BOT,0.02,-BOT),V(-BOT,0.02,-BOT), redMat));
+
+    // door on the red front — hinged so it swings open, with a white glow revealed behind it
+    { const bc = V(0,0,BOT), tc = V(0,H,TOP);
+      const up = tc.clone().sub(bc).normalize(), right = V(1,0,0);
+      const normal = right.clone().cross(up).normalize();
+      const doorW = 0.78, doorH = 1.55;
+      const center = bc.clone().addScaledVector(up, doorH/2 + 0.04).addScaledVector(normal, 0.02);
+      const basis = new THREE.Matrix4().makeBasis(right, up, normal);
+
+      // static frame
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(doorW+0.16, doorH+0.16, 0.06), frameMat);
+      frame.quaternion.setFromRotationMatrix(basis); frame.position.copy(center);
+      frame.castShadow = true; bucketGroup.add(frame);
+
+      // white light in the doorway (fades up as the door opens)
+      const glow = new THREE.Mesh(new THREE.PlaneGeometry(doorW, doorH),
+        new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0,
+          side: THREE.DoubleSide, depthWrite: false, toneMapped: false }));
+      glow.quaternion.setFromRotationMatrix(basis);
+      glow.position.copy(center).addScaledVector(normal, -0.02);
+      bucketGroup.add(glow);
+      const halo = new THREE.Mesh(new THREE.PlaneGeometry(doorW*2.2, doorH*1.7),
+        new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0,
+          blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false, toneMapped: false }));
+      halo.quaternion.setFromRotationMatrix(basis);
+      halo.position.copy(center).addScaledVector(normal, 0.04);
+      bucketGroup.add(halo);
+      glow.userData.halo = halo;
+      popcornGlow = glow;
+
+      // hinged panel + knob (pivots on its left edge)
+      const hinge = new THREE.Group();
+      hinge.quaternion.setFromRotationMatrix(basis);
+      hinge.position.copy(center).addScaledVector(right, -doorW/2);
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(doorW, doorH, 0.06), doorMat);
+      panel.position.set(doorW/2, 0, 0.05); panel.castShadow = true; hinge.add(panel);
+      const knob = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 12), knobMat);
+      knob.position.set(doorW - 0.14, 0, 0.12); hinge.add(knob);
+      bucketGroup.add(hinge);
+      popcornDoor = hinge;
+    }
+
+    // seeded popcorn pile (stable, matches the editor)
+    function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a);
+      t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+    { const rng = mulberry32(20260715);
+      const count = Math.round(120 + AMOUNT*180);
+      const kernelGeo = new THREE.IcosahedronGeometry(1, 1);
+      const yFloor = H*0.28, hwFloor = (BOT + (TOP-BOT)*(yFloor/H)) * 0.95;
+      const floor = new THREE.Mesh(new THREE.BoxGeometry(hwFloor*2, 0.08, hwFloor*2), popMat);
+      floor.position.y = yFloor; floor.receiveShadow = true; popGroup.add(floor);
+      const yLow = H*0.26, yTop = H + 0.4;
+      for (let i=0;i<count;i++){
+        const floating = i >= count-5;
+        let cx, cy, cz, fit = 1;
+        if (floating){ const r = TOP*0.6*Math.sqrt(rng()), a = rng()*Math.PI*2;
+          cx = Math.cos(a)*r; cz = Math.sin(a)*r; cy = H + 0.5 + rng()*0.9;
+        } else {
+          cy = yLow + rng()*(yTop - yLow);
+          const wallHalf = BOT + (TOP-BOT)*(cy/H), hw = wallHalf - 0.12;
+          cx = (rng()*2-1)*hw; cz = (rng()*2-1)*hw;
+          const margin = wallHalf - Math.max(Math.abs(cx), Math.abs(cz));
+          fit = Math.min(1, margin / 0.30);
+        }
+        const kernel = new THREE.Group();
+        const lobes = 3 + Math.floor(rng()*3);
+        for (let k=0;k<lobes;k++){
+          const s = (0.13 + rng()*0.08) * fit;
+          const m = new THREE.Mesh(kernelGeo, popMat); m.castShadow = true;
+          m.position.set((rng()-0.5)*0.16*fit, (rng()-0.5)*0.16*fit, (rng()-0.5)*0.16*fit);
+          m.scale.setScalar(s * (0.85+rng()*0.3));
+          kernel.add(m);
+        }
+        kernel.position.set(cx, cy, cz);
+        kernel.rotation.set(rng()*6, rng()*6, rng()*6);
+        popGroup.add(kernel);
+      }
+    }
+
+    // place on the top-left halo (rim index 4), scaled up into a little building; door faces center
+    const a4 = (4/5)*Math.PI*2 - Math.PI/2;
+    const px = Math.cos(a4)*PATH_R, pz = Math.sin(a4)*PATH_R;
+    root.scale.setScalar(12);
+    root.position.set(px, 0, pz);
+    root.rotation.y = Math.atan2(-px, -pz);
+    scene.add(root);
+
+    // ground point just in front of the door (where the dog steps in)
+    root.updateMatrixWorld(true);
+    popcornEntry.copy(root.localToWorld(new THREE.Vector3(0, 0, BOT)));
+  })();
+
+  // ── color palette on the halo next to the popcorn (halo #0): saved colors, glowing blue portal ──
+  new GLTFLoader().load('../editors/color-palette.glb', (gltf) => {
+    const pal = gltf.scene;
+    const brush = pal.getObjectByName('brush'); if (brush) brush.removeFromParent();   // just the palette
+
+    let saved = {}; try { saved = JSON.parse(localStorage.getItem('lorelai-palette-colors') || '{}'); } catch (e) {}
+    let blueMesh = null;
+    pal.traverse(o => { if (o.isMesh){ o.castShadow = true; o.receiveShadow = true;
+      const list = Array.isArray(o.material) ? o.material : [o.material];
+      list.forEach(m => { if (m && m.name){
+        if (saved[m.name]) m.color.set(saved[m.name]);
+        if (m.name === 'Material.007'){ blueMesh = o; paletteGlow = m; }   // the blue paint
+      } }); } });
+
+    pal.updateMatrixWorld(true);
+    let pb = new THREE.Box3().setFromObject(pal);
+    const psize = new THREE.Vector3(); pb.getSize(psize);
+    pal.scale.setScalar(72 / Math.max(psize.x, psize.y, psize.z));   // a LOT bigger
+
+    pal.updateMatrixWorld(true);
+    pb = new THREE.Box3().setFromObject(pal);
+    const pc = new THREE.Vector3(); pb.getCenter(pc);
+    pal.position.x -= pc.x; pal.position.z -= pc.z; pal.position.y -= pb.min.y;  // center + on the ground
+
+    const a0 = (0/5)*Math.PI*2 - Math.PI/2;    // halo #0 — to the popcorn's right in the overview
+    pal.position.x += Math.cos(a0)*PATH_R;
+    pal.position.z += Math.sin(a0)*PATH_R;
+    scene.add(pal);
+    paletteObj = pal;
+    pal.updateMatrixWorld(true);
+
+    // make the blue paint glow, and use it as the gallery portal
+    if (blueMesh && paletteGlow){
+      new THREE.Box3().setFromObject(blueMesh).getCenter(palettePortal);
+      // neon: bright + saturated, and not tone-mapped down to white
+      paletteGlow.toneMapped = false;
+      paletteGlow.emissive = paletteGlow.color.clone();
+      paletteGlow.emissiveIntensity = 3.5;
+    }
+  });
 
   // ================= dog =================
   const dogRig = new THREE.Group();   // yaw + position live here
@@ -100,7 +385,7 @@
   dogRig.add(model); scene.add(dogRig);
 
   const FACE = Math.PI;               // spin the model so its head points forward (flip to 0 if it moonwalks)
-  const TARGET_H = 3.2;
+  const TARGET_H = 7;
 
   let dogMesh = null;
   const dogMat = new THREE.MeshStandardMaterial({ color: 0xef5aa8, roughness: 0.35, metalness: 0.05 });
@@ -202,16 +487,31 @@
   const keys = {};
   addEventListener('keydown', e => { keys[e.code]=true; if(e.code.startsWith('Arrow')) e.preventDefault(); });
   addEventListener('keyup',   e => { keys[e.code]=false; });
-  let camDist = 14;
-  addEventListener('wheel', e => { camDist = Math.max(7, Math.min(40, camDist + e.deltaY*0.02)); }, {passive:true});
+  const CAM_PRESETS = { play: 40, overview: 420 };
+  let camMode = 'overview';
+  let camDist = CAM_PRESETS[camMode];   // start zoomed out so the whole world is visible
+  addEventListener('wheel', e => { camDist = Math.max(6, Math.min(1400, camDist + e.deltaY*0.4)); }, {passive:true});
+  addEventListener('keydown', e => {
+    if (e.code === 'KeyV') { camMode = camMode === 'play' ? 'overview' : 'play'; camDist = CAM_PRESETS[camMode]; }
+  });
 
   let heading = 0;
-  const MOVE = 11, TURN = 2.3;
+  const MOVE = 20, TURN = 2.6;
   const clock = new THREE.Clock();
+  let elapsed = 0;
 
   function animate(){
     requestAnimationFrame(animate);
     const dt = Math.min(0.05, clock.getDelta());
+    elapsed += dt;
+
+    // pulse the marker halos
+    for (const h of halos){
+      const p = 0.5 + 0.5*Math.sin(elapsed*2 + h.phase);
+      h.core.material.opacity = 0.55 + 0.4*p;
+      h.glow.material.opacity = 0.18 + 0.28*p;
+      const s = 1 + 0.07*p; h.grp.scale.set(s, 1, s);
+    }
 
     let move = 0, turn = 0;
     if (keys.KeyW || keys.ArrowUp)   move += 1;
@@ -226,15 +526,47 @@
 
     if (dogMesh){
       walking = move !== 0;
-      if (walking){ walkT += dt * 9; deformWalk(); }
+      if (walking){ walkT += dt * 13; deformWalk(); }
       else if (restPos){ restoreRest(); }
+
+      // climb physics: follow the surface under the dog (dish floor, or up onto the palette)
+      const walk = paletteObj ? [dishTop, paletteObj] : [dishTop];
+      downRay.set(_downOrigin.set(dogRig.position.x, 300, dogRig.position.z), _down);
+      const hit = downRay.intersectObjects(walk, true)[0];
+      if (hit) dogRig.position.y += (hit.point.y - dogRig.position.y) * Math.min(1, dt*10);
+    }
+
+    // popcorn portal: door stays shut until you're close, then swings open fast;
+    // walk into the white light to get transported.
+    if (popcornDoor){
+      const dx = dogRig.position.x - popcornEntry.x, dz = dogRig.position.z - popcornEntry.z;
+      const dist = Math.hypot(dx, dz);
+      const OPEN = 48, TOUCH = 13;
+      const wantOpen = dist < OPEN ? 1 : 0;
+      popcornDoor.rotation.y = THREE.MathUtils.lerp(popcornDoor.rotation.y, -wantOpen * Math.PI * 0.62, 0.3);
+      if (popcornGlow){
+        popcornGlow.material.opacity = THREE.MathUtils.lerp(popcornGlow.material.opacity, wantOpen*0.95, 0.3);
+        const halo = popcornGlow.userData.halo;
+        if (halo) halo.material.opacity = THREE.MathUtils.lerp(halo.material.opacity, wantOpen*0.5, 0.3);
+      }
+      if (!portalTriggered && dist < TOUCH){ portalTriggered = true; enterPortal(); }
+    }
+
+    // palette portal: pulse the glowing blue paint; step on it to enter the gallery
+    if (paletteGlow){
+      const p = 0.5 + 0.5*Math.sin(elapsed*2.5);
+      paletteGlow.emissiveIntensity = 2.4 + 2.6*p;   // pulsing neon, cranked
+      if (!galleryTriggered && dogMesh){
+        const dx = dogRig.position.x - palettePortal.x, dz = dogRig.position.z - palettePortal.z;
+        if (dx*dx + dz*dz < 13*13){ galleryTriggered = true; enterGallery(); }
+      }
     }
 
     // fixed-angle follow camera: tracks the dog's position but NOT its heading,
     // so the dog can freely turn around (faces you coming toward the camera, turns away going off)
     const cx = dogRig.position.x + camDist*0.30;
     const cz = dogRig.position.z + camDist*0.78;
-    const cy = dogRig.position.y + camDist*0.70;   // elevated but less steep
+    const cy = dogRig.position.y + camDist*1.05;   // higher up, steeper look-down
     camera.position.lerp(new THREE.Vector3(cx, cy, cz), 0.12);
     camera.lookAt(dogRig.position.x, dogRig.position.y + 1.2, dogRig.position.z);
 
