@@ -24,6 +24,7 @@ function enterEditMode() {
   if (currentCategory !== 'film' && currentCategory !== 'apps') uploadArea.classList.remove('hidden');
   editLink.textContent = '✕';
   editLink.title = 'Exit edit mode';
+  gallery.querySelectorAll('[data-id]').forEach(el => el.setAttribute('draggable', 'true'));
   if (currentCategory === 'film') listenToFilms();
 }
 
@@ -33,6 +34,7 @@ function exitEditMode() {
   uploadArea.classList.add('hidden');
   editLink.textContent = '✎';
   editLink.title = 'Edit gallery';
+  gallery.querySelectorAll('[data-id]').forEach(el => el.setAttribute('draggable', 'false'));
   if (currentCategory === 'film') listenToFilms();
 }
 
@@ -60,10 +62,71 @@ editLink.addEventListener('click', async e => {
 });
 
 // ── Nav ───────────────────────────────────────────────────────────────────────
-const navBtns = document.querySelectorAll('.nav-btn');
+const navBtns = document.querySelectorAll('.nav-btn[data-category]');
 const gallery = document.getElementById('gallery');
 let currentCategory = 'digital';
 let unsubscribe = null;
+
+// ── Sort by saved order (falls back to createdAt for un-ordered items) ─────────
+function sortByOrder(a, b) {
+  const ad = a.data(), bd = b.data();
+  const ao = typeof ad.order === 'number' ? ad.order : null;
+  const bo = typeof bd.order === 'number' ? bd.order : null;
+  if (ao != null && bo != null) return ao - bo;
+  if (ao != null) return -1;
+  if (bo != null) return 1;
+  const at = ad.createdAt && ad.createdAt.toMillis ? ad.createdAt.toMillis() : 0;
+  const bt = bd.createdAt && bd.createdAt.toMillis ? bd.createdAt.toMillis() : 0;
+  return at - bt;
+}
+
+// ── Drag-to-reorder (owner, edit mode) ────────────────────────────────────────
+let dragEl = null;
+gallery.addEventListener('dragstart', e => {
+  const item = e.target.closest('[data-id]');
+  if (!item || !document.body.classList.contains('edit-mode')) { e.preventDefault(); return; }
+  dragEl = item;
+  item.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  try { e.dataTransfer.setData('text/plain', item.dataset.id); } catch (_) {}
+});
+gallery.addEventListener('dragend', () => { if (dragEl) dragEl.classList.remove('dragging'); dragEl = null; });
+gallery.addEventListener('dragover', e => {
+  if (!dragEl) return;
+  e.preventDefault();
+  const after = getDragAfterElement(gallery, e.clientX, e.clientY);
+  if (after == null) gallery.appendChild(dragEl);
+  else gallery.insertBefore(dragEl, after);
+});
+gallery.addEventListener('drop', async e => {
+  if (!dragEl) return;
+  e.preventDefault();
+  await persistOrder();
+});
+
+function getDragAfterElement(container, x, y) {
+  const els = [...container.querySelectorAll('[data-id]:not(.dragging)')];
+  let closest = { dist: Infinity, el: null };
+  for (const el of els) {
+    const box = el.getBoundingClientRect();
+    const offX = x - (box.left + box.width / 2);
+    const offY = y - (box.top + box.height / 2);
+    if (offY < 0 || (Math.abs(offY) <= box.height / 2 && offX < 0)) {
+      const dist = Math.hypot(offX, offY);
+      if (dist < closest.dist) closest = { dist, el };
+    }
+  }
+  return closest.el;
+}
+
+async function persistOrder() {
+  const ids = [...gallery.querySelectorAll('[data-id]')].map(el => el.dataset.id);
+  if (!ids.length) return;
+  const coll = gallery.classList.contains('film-mode') ? 'films' : 'pieces';
+  const batch = db.batch();
+  ids.forEach((id, i) => batch.update(db.collection(coll).doc(id), { order: i }));
+  try { await batch.commit(); } catch (err) { console.error('Reorder save failed', err); }
+}
 
 navBtns.forEach(btn => {
   btn.addEventListener('click', () => {
@@ -104,7 +167,8 @@ function listenToGallery(category) {
     .orderBy('createdAt', 'asc')
     .onSnapshot(async snapshot => {
       gallery.innerHTML = '';
-      for (const doc of snapshot.docs) {
+      const ordered = snapshot.docs.slice().sort(sortByOrder);
+      for (const doc of ordered) {
         const item = { id: doc.id, ...doc.data() };
         if (item.filename && item.filename.endsWith('.pdf')) {
           await renderPDF(item);
@@ -157,6 +221,10 @@ async function renderPDF(item) {
 function createItem(item, titleOverride) {
   const el = document.createElement('div');
   el.className = 'gallery-item';
+  if (item && item.id) {
+    el.dataset.id = item.id;
+    el.setAttribute('draggable', document.body.classList.contains('edit-mode') ? 'true' : 'false');
+  }
 
   const removeBtn = document.createElement('button');
   removeBtn.className = 'remove-btn';
@@ -212,7 +280,7 @@ function listenToFilms() {
       if (document.body.classList.contains('edit-mode')) {
         gallery.appendChild(createAddFilmCard());
       }
-      snapshot.docs.forEach(doc => {
+      snapshot.docs.slice().sort(sortByOrder).forEach(doc => {
         gallery.appendChild(createFilmCard({ id: doc.id, ...doc.data() }));
       });
       if (snapshot.empty && !document.body.classList.contains('edit-mode')) {
@@ -227,6 +295,8 @@ function listenToFilms() {
 function createFilmCard(film) {
   const card = document.createElement('div');
   card.className = 'film-card';
+  card.dataset.id = film.id;
+  card.setAttribute('draggable', document.body.classList.contains('edit-mode') ? 'true' : 'false');
 
   const thumb = document.createElement('div');
   thumb.className = 'film-card-thumb';

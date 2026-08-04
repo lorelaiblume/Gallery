@@ -945,3 +945,13 @@ body.film-playing { overflow: hidden; }
   .film-editor-add { flex-direction: column; }
   #addCommentAtBtn { width: 100%; text-align: center; }
 }
+
+/* ── Drag-to-reorder (edit mode) ── */
+body.edit-mode .gallery-item[draggable="true"],
+body.edit-mode .film-card[draggable="true"] { cursor: grab; }
+body.edit-mode .gallery-item[draggable="true"]:active,
+body.edit-mode .film-card[draggable="true"]:active { cursor: grabbing; }
+.gallery-item.dragging,
+.film-card.dragging { opacity: 0.4; }
+body.edit-mode .gallery-item[draggable="true"] { outline: 1px dashed transparent; transition: outline-color .15s; }
+body.edit-mode .gallery-item[draggable="true"]:hover { outline-color: #d0a8ce; }
