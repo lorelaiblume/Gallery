@@ -138,8 +138,9 @@
       }
     });
 
-    // re-apply any colors you saved last time
-    const saved = loadSaved();
+    // baked-in defaults (Lorelai's palette) merged with anything saved locally
+    const BAKED = {"Material.002":"#c4212f","Material.005":"#35db29","Material.004":"#e1ae23","Material.006":"#0f89bd","Material.007":"#7a41b4","Material.003":"#cc5b0f","palitra":"#6d4b3c"};
+    const saved = Object.assign({}, BAKED, loadSaved());
     for (const [name, hex] of Object.entries(saved)) if (mats[name]) mats[name].color.set(hex);
 
     // seat on the ground, center + frame the camera

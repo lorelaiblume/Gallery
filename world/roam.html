@@ -343,13 +343,16 @@
     const pal = gltf.scene;
     const brush = pal.getObjectByName('brush'); if (brush) brush.removeFromParent();   // just the palette
 
+    // baked-in palette colors (Lorelai's saved set) so the live site matches, no localStorage needed
+    const BAKED = {"Material.002":"#c4212f","Material.005":"#35db29","Material.004":"#e1ae23","Material.006":"#0f89bd","Material.007":"#7a41b4","Material.003":"#cc5b0f","palitra":"#6d4b3c"};
     let saved = {}; try { saved = JSON.parse(localStorage.getItem('lorelai-palette-colors') || '{}'); } catch (e) {}
+    const colors = Object.assign({}, BAKED, saved);
     let blueMesh = null;
     pal.traverse(o => { if (o.isMesh){ o.castShadow = true; o.receiveShadow = true;
       const list = Array.isArray(o.material) ? o.material : [o.material];
       list.forEach(m => { if (m && m.name){
-        if (saved[m.name]) m.color.set(saved[m.name]);
-        if (m.name === 'Material.007'){ blueMesh = o; paletteGlow = m; }   // the blue paint
+        if (colors[m.name]) m.color.set(colors[m.name]);
+        if (m.name === 'Material.007'){ blueMesh = o; paletteGlow = m; }   // the glowing portal paint
       } }); } });
 
     pal.updateMatrixWorld(true);
