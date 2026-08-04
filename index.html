@@ -4,99 +4,229 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Lorelai Blume</title>
-  <link rel="stylesheet" href="styles.css" />
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 34px; padding: 40px 24px;
+      font-family: 'Karla', -apple-system, Segoe UI, sans-serif;
+      background: radial-gradient(120% 90% at 50% -10%, #f7d6f5 0%, #ecc9f4 45%, #e7c3f2 100%);
+      color: #3a2b3a;
+    }
+    header { text-align: center; }
+    header h1 {
+      font-size: clamp(1.4rem, 4.5vw, 2.4rem); letter-spacing: .34em; text-transform: uppercase;
+      font-weight: 700; color: #4a2f49;
+    }
+    header p { margin-top: 8px; font-size: 12px; letter-spacing: .3em; text-transform: uppercase; color: #9a6f97; }
+
+    .cards { display: flex; gap: clamp(20px, 4vw, 46px); flex-wrap: wrap; justify-content: center; }
+    .card {
+      width: clamp(250px, 34vw, 380px); aspect-ratio: 3 / 4;
+      display: flex; flex-direction: column; overflow: hidden;
+      border-radius: 28px; background: #fbeafb; text-decoration: none; color: inherit;
+      box-shadow: 0 18px 50px rgba(90,40,90,.22), inset 0 0 0 1px rgba(255,255,255,.6);
+      transition: transform .28s cubic-bezier(.2,.7,.2,1), box-shadow .28s ease;
+      cursor: pointer;
+    }
+    .card:hover { transform: translateY(-8px) scale(1.015); box-shadow: 0 30px 70px rgba(90,40,90,.32), inset 0 0 0 1px rgba(255,255,255,.7); }
+    .viz { flex: 1; position: relative; overflow: hidden; background: #f3ddf5; }
+    .viz canvas { display: block; width: 100%; height: 100%; }
+    .viz img { width: 100%; height: 100%; object-fit: cover; object-position: center 50%; display: block; }
+    .label {
+      padding: 16px 14px 20px; text-align: center;
+      font-size: clamp(13px, 1.7vw, 16px); letter-spacing: .18em; text-transform: uppercase; font-weight: 700;
+      color: #4a2f49;
+    }
+    .label .arrow { color: #b06cae; transition: transform .28s ease; display: inline-block; margin-left: 6px; }
+    .card:hover .label .arrow { transform: translateX(5px); }
+    #loading { position: absolute; inset: 0; display: grid; place-items: center; font-size: 12px; color: #9a6f97;
+      letter-spacing: .1em; }
+
+    /* highlight-to-color tool */
+    .colorbar { position: fixed; top: 16px; right: 16px; z-index: 30; display: flex; align-items: center; gap: 12px;
+      padding: 9px 9px 9px 15px; border-radius: 999px; background: rgba(255,255,255,.9); backdrop-filter: blur(8px);
+      box-shadow: 0 10px 30px rgba(90,40,90,.24); font-size: 12px; color: #6a3f68; letter-spacing: .02em; }
+    .colorbar input[type=color] { width: 34px; height: 34px; border: none; border-radius: 50%; background: none; padding: 0; cursor: pointer; }
+    .colorbar input[type=range] { width: 120px; accent-color: #c563bf; }
+    #ttl, #sub { cursor: text; }
+    #ttl:focus, #sub:focus { outline: none; }
+  </style>
 </head>
 <body>
-  <header>
-    <h1>LORELAI BLUME</h1>
-    <p class="subheading">Art Portfolio</p>
-    <nav>
-      <button class="nav-btn active" data-category="digital">Digital Art</button>
-      <button class="nav-btn" data-category="watercolor">Watercolor</button>
-      <button class="nav-btn" data-category="drawings">Drawings</button>
-      <button class="nav-btn" data-category="film">Film</button>
-      <!-- <button class="nav-btn" data-category="apps">Apps</button> -->
-      <a class="nav-btn" href="/editors">Editors</a>
-      <a class="nav-btn" href="https://github.com/lorelaiblume/Gallery" target="_blank" rel="noopener">GitHub</a>
-      <a class="nav-btn" href="world/roam.html">World</a>
-    </nav>
+  <header id="hdr" style="transform: translate(0px, 8px)">
+    <h1 id="ttl" style="font-size:47px; font-weight:700; letter-spacing:6px">Welcome to lorelai<span style="color:#ff7485">b</span><span style="color:#ff9868">l</span><span style="color:#ffe159">u</span><span style="color:#cdff73">m</span><span style="color:#72d6f2">e</span>.com!</h1>
+    <p id="sub" style="font-size:18px; font-weight:700">choose your adventure</p>
   </header>
 
-  <main>
-    <div class="upload-area hidden" id="uploadArea">
-      <input type="file" id="fileInput" accept="image/*,.pdf" multiple hidden />
-      <p>Drop images or PDFs here</p>
-      <button id="browseBtn">Browse Files</button>
-      <button id="bulkImportBtn">Bulk Import from This Browser</button>
-    </div>
-
-    <div class="gallery" id="gallery">
-      <div class="loading" id="loadingMsg">Loading...</div>
-    </div>
-  </main>
-
-  <div class="toolbar" id="toolbar">
-    <a class="toolbar-btn" id="editLink" href="?edit" title="Add art">✎</a>
-    <button class="toolbar-btn" id="qrBtn" title="Share on phone">⬡</button>
+  <div class="colorbar" id="colorbar" style="display:none">
+    <input type="color" id="colorPick" value="#4a2f49" title="Highlight text, then pick a color" />
+    <span>Spacing</span>
+    <input type="range" id="spacePick" min="-4" max="70" step="1" title="Top-line letter spacing" />
   </div>
 
-  <div class="modal-overlay hidden" id="qrModal">
-    <div class="modal qr-only">
-      <div id="qrCode"></div>
-    </div>
+  <div class="cards">
+    <a class="card" href="world/roam.html">
+      <div class="viz"><div id="loading">waking the dog…</div><canvas id="dog"></canvas></div>
+      <div class="label">Explore Lor's 3D World <span class="arrow">→</span></div>
+    </a>
+    <a class="card" href="website.html">
+      <div class="viz"><img src="assets/skater.png" alt="Explore the website" /></div>
+      <div class="label">Explore Website <span class="arrow">→</span></div>
+    </a>
   </div>
 
-  <!-- App Modal -->
-  <div class="app-modal hidden" id="appModal">
-    <div class="app-modal-inner">
-      <div class="app-modal-header">
-        <h2 id="appModalTitle"></h2>
-        <button class="app-close" id="appClose">×</button>
-      </div>
-      <div class="app-stage-wrap" id="appStageWrap">
-        <div class="app-stage" id="appStage"></div>
-      </div>
-    </div>
-  </div>
+  <script>
+  // ── heading: keep saved edits, add highlight-to-color ──
+  (function(){
+    const KEY = 'lorelai-landing-header';
+    const hdr = document.getElementById('hdr'), ttl = document.getElementById('ttl'), sub = document.getElementById('sub');
+    const EDIT = new URLSearchParams(location.search).has('edit');
+    if (!EDIT) return;                       // public sees the baked heading; add ?edit to the URL to tweak
+    document.getElementById('colorbar').style.display = 'flex';
+    let st = {};
+    try { st = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) {}
 
-  <!-- Film Player Modal -->
-  <div class="film-modal hidden" id="filmModal">
-    <div class="film-modal-inner">
-      <div class="film-modal-header">
-        <h2 id="filmPlayerTitle"></h2>
-        <label class="commentary-toggle hidden" id="commentaryToggleLabel">
-          <input type="checkbox" id="commentaryToggle" checked />
-          Director's Commentary
-        </label>
-        <button class="film-close" id="filmClose">×</button>
-      </div>
-      <div class="film-player-wrap">
-        <video id="filmVideo" controls playsinline></video>
-        <div class="commentary-display" id="commentaryDisplay">
-          <div class="commentary-accent"></div>
-          <p class="commentary-text" id="commentaryText"></p>
-        </div>
-      </div>
-      <!-- Editor panel — edit mode only -->
-      <div class="film-editor-panel hidden" id="filmEditorPanel">
-        <div class="film-editor-title-row">
-          <input id="filmTitleEdit" class="film-editor-title-input" placeholder="Film title" />
-        </div>
-        <div class="film-editor-add">
-          <textarea id="newCommentText" placeholder="Director's note…" rows="2"></textarea>
-          <button id="addCommentAtBtn">Add note at 0:00</button>
-        </div>
-        <div class="film-editor-list" id="editorCommentList"></div>
-      </div>
-    </div>
-  </div>
+    // preserve your earlier text/size/boldness/position changes
+    if (st.size1)   ttl.style.fontSize   = st.size1 + 'px';
+    if (st.weight1) ttl.style.fontWeight = st.weight1;
+    if (st.size2)   sub.style.fontSize   = st.size2 + 'px';
+    if (st.weight2) sub.style.fontWeight = st.weight2;
+    if (st.x != null || st.y != null) hdr.style.transform = `translate(${st.x||0}px, ${st.y||0}px)`;
+    if (st.titleHTML) ttl.innerHTML = st.titleHTML; else if (st.title) ttl.textContent = st.title;
+    if (st.subHTML)   sub.innerHTML = st.subHTML;   else if (st.sub)   sub.textContent = st.sub;
 
-  <!-- Firebase SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <script src="app.js"></script>
+    // top-line letter spacing
+    const spacing = ('spacing1' in st) ? st.spacing1 : 14;
+    ttl.style.letterSpacing = spacing + 'px';
+    const sp = document.getElementById('spacePick'); sp.value = spacing;
+
+    // editable so you can select letters/phrases (and still edit the words)
+    [ttl, sub].forEach(elm => { elm.contentEditable = 'true'; elm.spellcheck = false; });
+    function save(){ st.titleHTML = ttl.innerHTML; st.subHTML = sub.innerHTML; localStorage.setItem(KEY, JSON.stringify(st)); }
+    ttl.addEventListener('input', save); sub.addEventListener('input', save);
+    sp.addEventListener('input', e => { st.spacing1 = +e.target.value; ttl.style.letterSpacing = st.spacing1 + 'px'; save(); });
+
+    // remember the last text selection made inside the heading
+    let range = null;
+    document.addEventListener('selectionchange', () => {
+      const sel = window.getSelection();
+      if (sel.rangeCount && !sel.isCollapsed && hdr.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+        range = sel.getRangeAt(0).cloneRange();
+      }
+    });
+
+    // pick a color → recolor the highlighted text
+    document.getElementById('colorPick').addEventListener('input', e => {
+      if (!range || range.collapsed) return;
+      const span = document.createElement('span'); span.style.color = e.target.value;
+      try { range.surroundContents(span); }
+      catch (err) { span.appendChild(range.extractContents()); range.insertNode(span); }
+      save();
+    });
+  })();
+  </script>
+
+  <script type="importmap">
+  { "imports": {
+      "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/"
+  } }
+  </script>
+  <script type="module">
+  import * as THREE from 'three';
+  import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+  import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+  const canvas = document.getElementById('dog');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.1;
+
+  const scene = new THREE.Scene();
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+  const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+  camera.position.set(0, 3.0, 8.4);
+
+  scene.add(new THREE.HemisphereLight(0xffffff, 0xe7b9d6, 0.9));
+  const key = new THREE.DirectionalLight(0xfff4ea, 1.2); key.position.set(4, 7, 5); scene.add(key);
+  const fill = new THREE.DirectionalLight(0xbfd4ff, 0.35); fill.position.set(-4, 2, -3); scene.add(fill);
+
+  // ── rainbow-striped disc (rainbow-bridge colours, diagonal print) ──
+  function stripeTexture(){
+    const S = 512, c = document.createElement('canvas'); c.width = c.height = S;
+    const g = c.getContext('2d');
+    const COLORS = ['#6a86ef','#56c5f1','#a9e05a','#f6b74a','#f0794c','#ef5566'];
+    const n = COLORS.length;
+    g.save();
+    g.translate(S/2, S/2); g.rotate(-Math.PI * 0.28); g.translate(-S/2, -S/2);
+    const bw = S / 6;                                    // thin stripes (unchanged)
+    const start = (S - bw*n) / 2;                        // one centred rainbow
+    const bounds = []; for (let i = 0; i <= n; i++) bounds.push(start + i*bw);
+    bounds[0] = -6*S; bounds[n] = 7*S;                   // clamp ends: blue one way, red the other — no stray band
+    for (let i = 0; i < n; i++){
+      g.fillStyle = COLORS[i];
+      g.fillRect(bounds[i], -6*S, bounds[i+1] - bounds[i], 13*S);
+    }
+    g.restore();
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+    return t;
+  }
+  const R = 2.0, TH = 0.30;
+  // one solid disc, textured with a top-down (planar) projection so the stripes
+  // wrap over the top AND straight down the band
+  const geo = new THREE.CylinderGeometry(R, R, TH, 160, 1, false);
+  const pos = geo.attributes.position, uv = new Float32Array(pos.count * 2);
+  for (let i = 0; i < pos.count; i++){
+    uv[i*2]   = (pos.getX(i) + R) / (2*R);
+    uv[i*2+1] = (pos.getZ(i) + R) / (2*R);
+  }
+  geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  const tex = stripeTexture(); tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+  const disc = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+    map: tex, roughness: 0.5, metalness: 0, toneMapped: false }));
+  scene.add(disc);
+
+  // ── balloon dog ──
+  const dogSpin = new THREE.Group(); scene.add(dogSpin);
+  new GLTFLoader().load('editors/dog.glb', (gltf) => {
+    let mesh = null; gltf.scene.traverse(o => { if (o.isMesh) mesh = o; });
+    mesh.geometry.computeVertexNormals();
+    mesh.material = new THREE.MeshStandardMaterial({ color: 0xef5aa8, roughness: 0.35, metalness: 0.05 });
+    const box = new THREE.Box3().setFromObject(mesh);
+    const size = new THREE.Vector3(); box.getSize(size);
+    const c = new THREE.Vector3(); box.getCenter(c);
+    mesh.position.set(-c.x, -box.min.y, -c.z);
+    const holder = new THREE.Group(); holder.add(mesh);
+    holder.scale.setScalar(2.3 / size.y);
+    holder.position.y = TH / 2;                     // feet on the striped top
+    dogSpin.add(holder);
+    document.getElementById('loading').style.display = 'none';
+  });
+
+  function resize(){
+    const v = canvas.parentElement;
+    const w = v.clientWidth, h = v.clientHeight;
+    if (!w || !h) return;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h; camera.updateProjectionMatrix();
+  }
+  resize(); addEventListener('resize', resize);
+  new ResizeObserver(resize).observe(canvas.parentElement);
+
+  const clock = new THREE.Clock();
+  function animate(){
+    requestAnimationFrame(animate);
+    dogSpin.rotation.y += clock.getDelta() * 0.5;   // slow spin
+    camera.lookAt(0, 0.85, 0);
+    renderer.render(scene, camera);
+  }
+  animate();
+  </script>
 </body>
 </html>

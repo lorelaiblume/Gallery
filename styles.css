@@ -6,6 +6,10 @@
   padding: 0;
 }
 
+/* ── uniform typeface: everything matches the "Art Portfolio" subheading ── */
+* { font-family: 'Karla', sans-serif !important; }
+.nav-btn { text-decoration: none !important; }   /* keep nav links un-underlined */
+
 body {
   background: #ffffff;
   color: #111;

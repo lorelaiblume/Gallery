@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lorelai Blume</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>LORELAI BLUME</h1>
+    <p class="subheading">Art Portfolio</p>
+    <nav>
+      <button class="nav-btn active" data-category="digital">Digital Art</button>
+      <button class="nav-btn" data-category="watercolor">Watercolor</button>
+      <button class="nav-btn" data-category="drawings">Drawings</button>
+      <button class="nav-btn" data-category="film">Film</button>
+      <!-- <button class="nav-btn" data-category="apps">Apps</button> -->
+      <a class="nav-btn" href="/editors">Editors</a>
+      <a class="nav-btn" href="https://github.com/lorelaiblume/Gallery" target="_blank" rel="noopener">GitHub</a>
+      <a class="nav-btn" href="world/roam.html">World</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="upload-area hidden" id="uploadArea">
+      <input type="file" id="fileInput" accept="image/*,.pdf" multiple hidden />
+      <p>Drop images or PDFs here</p>
+      <button id="browseBtn">Browse Files</button>
+      <button id="bulkImportBtn">Bulk Import from This Browser</button>
+    </div>
+
+    <div class="gallery" id="gallery">
+      <div class="loading" id="loadingMsg">Loading...</div>
+    </div>
+  </main>
+
+  <div class="toolbar" id="toolbar">
+    <a class="toolbar-btn" id="editLink" href="?edit" title="Add art">✎</a>
+    <button class="toolbar-btn" id="qrBtn" title="Share on phone">⬡</button>
+  </div>
+
+  <div class="modal-overlay hidden" id="qrModal">
+    <div class="modal qr-only">
+      <div id="qrCode"></div>
+    </div>
+  </div>
+
+  <!-- App Modal -->
+  <div class="app-modal hidden" id="appModal">
+    <div class="app-modal-inner">
+      <div class="app-modal-header">
+        <h2 id="appModalTitle"></h2>
+        <button class="app-close" id="appClose">×</button>
+      </div>
+      <div class="app-stage-wrap" id="appStageWrap">
+        <div class="app-stage" id="appStage"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Film Player Modal -->
+  <div class="film-modal hidden" id="filmModal">
+    <div class="film-modal-inner">
+      <div class="film-modal-header">
+        <h2 id="filmPlayerTitle"></h2>
+        <label class="commentary-toggle hidden" id="commentaryToggleLabel">
+          <input type="checkbox" id="commentaryToggle" checked />
+          Director's Commentary
+        </label>
+        <button class="film-close" id="filmClose">×</button>
+      </div>
+      <div class="film-player-wrap">
+        <video id="filmVideo" controls playsinline></video>
+        <div class="commentary-display" id="commentaryDisplay">
+          <div class="commentary-accent"></div>
+          <p class="commentary-text" id="commentaryText"></p>
+        </div>
+      </div>
+      <!-- Editor panel — edit mode only -->
+      <div class="film-editor-panel hidden" id="filmEditorPanel">
+        <div class="film-editor-title-row">
+          <input id="filmTitleEdit" class="film-editor-title-input" placeholder="Film title" />
+        </div>
+        <div class="film-editor-add">
+          <textarea id="newCommentText" placeholder="Director's note…" rows="2"></textarea>
+          <button id="addCommentAtBtn">Add note at 0:00</button>
+        </div>
+        <div class="film-editor-list" id="editorCommentList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

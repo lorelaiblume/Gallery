@@ -95,12 +95,13 @@
 
   // ── art on the walls (digital pieces, with titles) ──
   const ART = [
-    { title: "Bubble Bath", src: "gallery-art/bubble-bath.jpg" },            // portrait ─┐ the two
-    { title: "Unfinished Piece", src: "gallery-art/unfinished-piece.jpg" },  // portrait ─┘ verticals
-    { title: "Juice Pop", src: "gallery-art/juice-pop.jpg" },
-    { title: "Rainbow Sherbert", src: "gallery-art/rainbow-sherbert.jpg" },
-    { title: "Squiggles Stripes & Stars", src: "gallery-art/squiggles-stripes-stars.jpg" },
-    { title: "Frootie Tootie", src: "gallery-art/frootie-tootie.jpg" },
+    { title: "Juice Pop", src: "gallery-art/juice-pop.jpg" },                             // right wall
+    { title: "Rainbow Sherbert", src: "gallery-art/rainbow-sherbert.jpg" },               // right wall
+    { title: "Squiggles Stripes & Stars", src: "gallery-art/squiggles-stripes-stars.jpg" }, // front wall
+    { title: "Frootie Tootie", src: "gallery-art/frootie-tootie.jpg" },                   // front wall
+    { title: "Bubble Bath", src: "gallery-art/bubble-bath.jpg" },                         // left wall — left of the guy
+    { title: "Skater Guy", src: "gallery-art/skater-guy.png" },                           // left wall — center
+    { title: "Finished Piece", src: "gallery-art/finished-piece.png" },                   // left wall — right of the guy
   ];
   const HCENTER = 13, ARTH = 22;               // every piece is this tall → equal small gap top & bottom
   const texLoader = new THREE.TextureLoader();
@@ -137,7 +138,7 @@
       { fixed: 'z', at:  halfD, ry: Math.PI },     // front
       { fixed: 'x', at: -halfW, ry: Math.PI/2 },   // left
     ];
-    const layout = [2, 2, 1, 1];                   // pieces per wall, filled in array order
+    const layout = [0, 2, 2, 3];                   // back: message only · right: 2 · front: 2 · left: purple + guy + rainbow
     let idx = 0;
     walls.forEach((wall, w) => {
       const n = layout[w];

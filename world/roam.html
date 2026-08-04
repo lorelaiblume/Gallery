@@ -130,7 +130,7 @@
     }
     makeHalo(0, 0);                                  // center
     for (let i = 0; i < 5; i++){                     // evenly spaced on the loop path
-      if (i === 4 || i === 0) continue;               // halos occupied by the popcorn (4) and palette (0)
+      if (i === 4 || i === 0 || i === 3) continue;    // halos occupied by popcorn (4), palette (0), rocket (3)
       const a = (i/5)*Math.PI*2 - Math.PI/2;         // first one at the top
       makeHalo(Math.cos(a)*PATH_R, Math.sin(a)*PATH_R);
     }
@@ -380,6 +380,27 @@
       paletteGlow.emissive = paletteGlow.color.clone();
       paletteGlow.emissiveIntensity = 3.5;
     }
+  });
+
+  // ── rocket ship on the halo to the popcorn's left (halo #3), BIG ──
+  new GLTFLoader().load('rocket.glb', (gltf) => {
+    const rocket = gltf.scene;
+    rocket.traverse(o => { if (o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
+
+    rocket.updateMatrixWorld(true);
+    let rb = new THREE.Box3().setFromObject(rocket);
+    const rs = new THREE.Vector3(); rb.getSize(rs);
+    rocket.scale.setScalar(55 / Math.max(rs.x, rs.y, rs.z));   // make it BIG
+
+    rocket.updateMatrixWorld(true);
+    rb = new THREE.Box3().setFromObject(rocket);
+    const rc = new THREE.Vector3(); rb.getCenter(rc);
+    rocket.position.x -= rc.x; rocket.position.z -= rc.z; rocket.position.y -= rb.min.y;  // center + on the ground
+
+    const a3 = (3/5)*Math.PI*2 - Math.PI/2;    // halo #3 — to the popcorn's left in the overview
+    rocket.position.x += Math.cos(a3)*PATH_R;
+    rocket.position.z += Math.sin(a3)*PATH_R;
+    scene.add(rocket);
   });
 
   // ================= dog =================
