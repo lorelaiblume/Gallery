@@ -259,8 +259,8 @@
               <span class="edit-hint">Click to upload</span>
             </div>
             <div>
-              <h1 class="welcome-title" data-edit="headline">Welcome to lorelaiblume.com!!!</h1>
-              <p class="bio" data-edit="bio">I created this website, along with my interactive 3D version of it titled "Lor's World" through vibe-coding with Claude! My dad, a software engineer of 33 years, has been teaching me about the structure of websites and how they are built. Additionally, I've been learning how to collaborate with AI to bring my original ideas to life.  I hope you enjoy exploring my portfolio! Go check out Lor's World for an interactive version of what you see here :)<br>- Lorelai &lt;3</p>
+              <h1 class="welcome-title" data-edit="headline">WELCOME TO MY PORTFOLIO!</h1>
+              <p class="bio" data-edit="bio">I created this website, along with my interactive 3D version of it titled "Lor's World" through vibe-coding with Claude! My dad, a software engineer of 33 years, has been teaching me about the structure of websites and the process for building them. Additionally, I've been learning how to collaborate with AI to bring my original ideas to life.  I hope you enjoy exploring my portfolio! Go check out Lor's World for an interactive version of what you see here :)<br>- Lorelai &lt;3</p>
               <p class="placeholder-note">click the text to rewrite it · click the portrait to add a photo</p>
             </div>
           </div>
@@ -381,8 +381,8 @@
     headline: document.querySelector('[data-edit="headline"]').innerHTML,
     bio: document.querySelector('.bio').innerHTML,
     aboutTitle: document.querySelector('[data-edit="aboutTitle"]').textContent,
-    portrait: null,
-    cards: [ { img:null, text:'' }, { img:null, text:'' }, { img:null, text:'' } ]
+    portrait: "assets/about/portrait.jpg",
+    cards: [{"img": "assets/about/photo-1.jpg", "text": "My name is Lorelai, I'm 17 years old from Massachusetts!"}, {"img": "assets/about/photo-2.jpg", "text": "I am going into my senior year at the Governor's Academy in Byfield, MA! "}, {"img": "assets/about/photo-3.jpg", "text": "I live with my Mom, Dad, my 15 yo sister Penny, and my 8 yo brother Cameron! "}, {"img": "assets/about/photo-4.jpg", "text": "We also have two cats! From top to bottom, we have Luna (aka Tuna), the baby of the family, and next we have the king of the house, Raven!"}, {"img": "assets/about/photo-5.jpg", "text": "I have played soccer my whole life, and currently play for the Govs Girls Varsity Soccer Team (aka the best team on campus)."}, {"img": "assets/about/photo-6.jpg", "text": "Ever since I was little, I have always had a passion for technology and computer science. This is me (at the Meta office in Menlo Park) working on what you're looking at right now!"}, {"img": "assets/about/photo-7.jpg", "text": "I have also always had a passion for film. I always LOVED going to the movies, and then I began taking film classes at school! I will be doing an independent film study my senior year."}, {"img": "assets/about/photo-8.jpg", "text": "Finally, I am beyond lucky to live right by the ocean. My amazing friends and I love going to the beach and exploring our community!"}, {"img": "assets/about/photo-9.jpg", "text": "We also love exploring Boston. I am a DIE HARD New England sports fan, and I have never seen anything like the sense of community and joy shared at a Fenway concert :)"}]
   };
   var state = load() || JSON.parse(JSON.stringify(defaults));
 
