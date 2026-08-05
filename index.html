@@ -1,593 +1,235 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Lorelai Blume</title>
-<link rel="icon" href="/favicon.ico" sizes="any" />
-<link rel="icon" type="image/png" href="/assets/favicon.png" />
-<link href="https://fonts.googleapis.com/css2?family=Karla:ital,wght@0,200;0,300;0,400;0,500;0,700;0,800;1,300;1,400;1,500&display=swap" rel="stylesheet">
-<!-- gallery / film / app styling (reused from the original site) -->
-<link rel="stylesheet" href="styles.css" />
-<style>
-  /* ═══ base + rail + about view (overrides styles.css where they overlap) ═══ */
-  *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lorelai Blume</title>
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" href="/assets/favicon.png" />
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 34px; padding: 40px 24px;
+      font-family: 'Karla', -apple-system, Segoe UI, sans-serif;
+      background: radial-gradient(120% 90% at 50% -10%, #f7d6f5 0%, #ecc9f4 45%, #e7c3f2 100%);
+      color: #3a2b3a;
+    }
+    header { text-align: center; }
+    header h1 {
+      font-size: clamp(1.4rem, 4.5vw, 2.4rem); letter-spacing: .34em; text-transform: uppercase;
+      font-weight: 700; color: #4a2f49;
+    }
+    header p { margin-top: 8px; font-size: 12px; letter-spacing: .3em; text-transform: uppercase; color: #9a6f97; }
 
-  :root{
-    --ink:#141414; --muted:#6f6f6f; --faint:#a6a6a6; --line:#d8d8d8;
-    --display:'Karla', sans-serif; --serif:'Karla', sans-serif;
-  }
-  html, body { height:auto; min-height:100%; }
-  body{
-    background:#fff; color:var(--ink);
-    font-family:var(--display) !important;
-    -webkit-font-smoothing:antialiased; -webkit-tap-highlight-color:transparent;
-  }
+    .cards { display: flex; gap: clamp(20px, 4vw, 46px); flex-wrap: wrap; justify-content: center; }
+    .card {
+      width: clamp(250px, 34vw, 380px); aspect-ratio: 3 / 4;
+      display: flex; flex-direction: column; overflow: hidden;
+      border-radius: 28px; background: #fbeafb; text-decoration: none; color: inherit;
+      box-shadow: 0 18px 50px rgba(90,40,90,.22), inset 0 0 0 1px rgba(255,255,255,.6);
+      transition: transform .28s cubic-bezier(.2,.7,.2,1), box-shadow .28s ease;
+      cursor: pointer;
+    }
+    .card:hover { transform: translateY(-8px) scale(1.015); box-shadow: 0 30px 70px rgba(90,40,90,.32), inset 0 0 0 1px rgba(255,255,255,.7); }
+    .viz { flex: 1; position: relative; overflow: hidden; background: #f3ddf5; }
+    .viz canvas { display: block; width: 100%; height: 100%; }
+    .viz img { width: 100%; height: 100%; object-fit: cover; object-position: center 50%; display: block; }
+    .label {
+      padding: 16px 14px 20px; text-align: center;
+      font-size: clamp(13px, 1.7vw, 16px); letter-spacing: .18em; text-transform: uppercase; font-weight: 700;
+      color: #4a2f49;
+    }
+    .label .arrow { color: #b06cae; transition: transform .28s ease; display: inline-block; margin-left: 6px; }
+    .card:hover .label .arrow { transform: translateX(5px); }
+    #loading { position: absolute; inset: 0; display: grid; place-items: center; font-size: 12px; color: #9a6f97;
+      letter-spacing: .1em; }
 
-  .grid{ display:grid; grid-template-columns:300px 1fr; min-height:100vh; }
-  .content{ min-width:0; }
-
-  /* ── LEFT RAIL ── */
-  .rail{ border-right:1px solid var(--line); padding:70px 38px; display:flex; flex-direction:column; }
-  .rail .name{
-    font-family:var(--display); font-weight:800; text-transform:uppercase; color:var(--ink);
-    font-size:2.1rem; letter-spacing:0.01em; line-height:1.02; transform:none;
-  }
-  .rail nav{ display:flex; flex-direction:column; margin-top:56px; gap:3px; align-items:flex-start; }
-
-  .rail .nav-btn{
-    font-family:var(--display) !important; font-weight:600; font-size:0.82rem; letter-spacing:0.14em;
-    text-transform:uppercase; color:var(--muted); text-decoration:none !important;
-    padding:9px 0 9px 14px; border:none; border-left:2px solid transparent; border-bottom:none; cursor:pointer;
-    transition:color .2s, border-color .2s; white-space:nowrap;
-    display:flex; align-items:center; gap:8px; background:none; text-align:left; outline:none;
-    position:static; bottom:auto; width:auto;
-  }
-  .rail .nav-btn:hover{ color:var(--ink); border-left-color:var(--ink); border-bottom:none; }
-  .rail .nav-btn.active{ color:var(--ink); border-left-color:var(--ink); border-bottom:none; }
-
-  .rail .has-sub{ position:relative; }
-  .rail .has-sub > .nav-btn .caret{ font-size:0.6rem; color:var(--faint); transition:transform .25s, color .2s; }
-  .rail .has-sub:hover > .nav-btn, .rail .has-sub.open > .nav-btn{ color:var(--ink); }
-  .rail .has-sub:hover > .nav-btn .caret, .rail .has-sub.open > .nav-btn .caret{ color:var(--ink); transform:translateX(2px); }
-
-  .rail .submenu{
-    position:absolute; left:calc(100% + 2px); top:-6px; background:#fff; border:1px solid var(--line);
-    box-shadow:0 10px 30px rgba(0,0,0,0.12); padding:8px 6px; min-width:200px; z-index:20;
-    opacity:0; visibility:hidden; transform:translateX(-6px);
-    transition:opacity .2s, transform .2s, visibility .2s; flex-direction:column;
-  }
-  .rail .has-sub:hover .submenu, .rail .has-sub.open .submenu{ opacity:1; visibility:visible; transform:translateX(0); }
-  .rail .submenu .nav-btn{
-    display:block; width:100%; padding:9px 16px; border-left:none; font-weight:500; font-size:0.76rem;
-    letter-spacing:0.14em; color:var(--muted);
-  }
-  .rail .submenu .nav-btn:hover{ color:var(--ink); background:#f6f6f6; border-left:none; }
-
-  .rail .nav-btn strong{ font-weight:800; }
-  #worldNav .rainbow{ letter-spacing:0.14em; }
-  #worldNav .rainbow span{ font-weight:800; }
-
-  /* ── views ── */
-  .view-gallery-section{ display:none; }
-  body.view-gallery .view-gallery-section{ display:block; }
-  body.view-gallery .view-about-section{ display:none; }
-
-  .gallery-wrap{ max-width:1200px; margin:0 auto; padding:60px 60px 90px; }
-
-  /* ── ABOUT VIEW ── */
-  .body{ padding:80px 70px 100px; }
-  .intro{ display:flex; gap:56px; align-items:flex-start; }
-  .portrait{
-    width:280px; height:340px; flex-shrink:0; position:relative; overflow:hidden;
-    background:#f4f4f4; border:1px solid var(--line); background-size:cover; background-position:center;
-  }
-  .portrait.empty{
-    background-image:
-      radial-gradient(circle at 30% 25%, rgba(255,120,180,0.55), transparent 45%),
-      radial-gradient(circle at 75% 35%, rgba(150,110,255,0.5), transparent 45%),
-      radial-gradient(circle at 55% 80%, rgba(120,220,180,0.5), transparent 45%),
-      radial-gradient(circle at 20% 75%, rgba(255,180,90,0.5), transparent 45%);
-  }
-  .portrait .ph-label{
-    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-    font-family:var(--display); font-weight:600; font-size:0.6rem; letter-spacing:0.28em;
-    text-transform:uppercase; color:rgba(0,0,0,0.34);
-  }
-  .welcome-title{
-    font-family:var(--display) !important; font-weight:800; font-size:2rem; line-height:1.15;
-    letter-spacing:0.005em; color:var(--ink); max-width:520px; margin-bottom:18px;
-    text-transform:none; transform:none;
-  }
-  .bio{
-    font-family:var(--serif); font-weight:400; font-style:italic; color:#242424;
-    line-height:1.72; font-size:1.22rem; max-width:450px;
-  }
-  .placeholder-note{
-    font-family:var(--display); font-weight:500; font-size:0.58rem; letter-spacing:0.16em;
-    text-transform:uppercase; color:var(--faint); margin-top:20px;
-  }
-  .divider{ border:none; border-top:1px solid var(--line); margin:70px 0 0; }
-  .about-title{
-    text-align:center; font-family:var(--display); font-weight:800; text-transform:uppercase;
-    letter-spacing:0.12em; font-size:1.9rem; color:var(--ink); margin:58px 0 46px;
-  }
-  .facts{ display:grid; grid-template-columns:repeat(3, 1fr); gap:34px 26px; max-width:1000px; margin:0 auto; }
-  .card{ position:relative; display:flex; flex-direction:column; gap:12px; }
-  .photo-box{
-    position:relative; width:100%; aspect-ratio:1/1; overflow:hidden; border:1px solid var(--line);
-    background:#fafafa; display:flex; align-items:center; justify-content:center;
-  }
-  .photo-box.filled{ background:none; border-color:transparent; }
-  .photo-box img{ width:100%; height:100%; object-fit:cover; display:block; }
-  body:not(.about-edit) .photo-box:not(.filled){ display:none; }
-  .card-ph{ display:flex; flex-direction:column; align-items:center; gap:10px; color:#bcbcbc; pointer-events:none; }
-  .card-ph .ic{ font-size:1.6rem; }
-  .card-ph .tx{ font-family:var(--display); font-weight:600; font-size:0.6rem; letter-spacing:0.18em; text-transform:uppercase; }
-  .cap{
-    font-family:var(--display); font-weight:400; font-size:0.95rem; line-height:1.55;
-    color:#333; text-align:center; outline:none;
-  }
-  body.about-edit .cap{ min-height:1.5em; }
-  body.about-edit .cap:empty::before{ content:attr(data-ph); color:#c4c4c4; }
-  .facts-hint{ text-align:center; font-family:var(--serif); font-style:italic; color:var(--faint); font-size:0.98rem; margin-top:38px; }
-  .add-tile{
-    display:none; border:1px dashed #c9c9c9; width:100%; aspect-ratio:1/1; border-radius:2px;
-    align-items:center; justify-content:center; background:none; cursor:pointer;
-    font-family:var(--display); font-weight:600; font-size:0.62rem; letter-spacing:0.16em;
-    text-transform:uppercase; color:var(--muted); transition:all .18s;
-  }
-  body.about-edit .add-tile{ display:flex; }
-  .add-tile:hover{ color:var(--ink); border-color:var(--ink); }
-
-  .card-del{
-    position:absolute; top:8px; right:8px; z-index:3; width:26px; height:26px; border-radius:50%;
-    border:1px solid var(--line); background:rgba(255,255,255,0.94); color:#888; cursor:pointer;
-    font-size:14px; display:none; align-items:center; justify-content:center; transition:all .18s;
-  }
-  body.about-edit .card:hover .card-del{ display:flex; }
-  .card-del:hover{ color:#c0392b; border-color:#c0392b; }
-
-  body.about-edit [data-edit]{ cursor:text; border-radius:3px; transition:box-shadow .15s, background .15s; }
-  body.about-edit [data-edit]:hover{ background:rgba(0,0,0,0.02); box-shadow:0 0 0 1px var(--line); }
-  body.about-edit [data-edit]:focus{ background:#fff; box-shadow:0 0 0 2px #bcbcbc; outline:none; }
-
-  body.about-edit .portrait, body.about-edit .photo-box{ cursor:pointer; }
-  .portrait .edit-hint, .photo-box .edit-hint{
-    position:absolute; inset:auto 0 0 0; padding:8px; z-index:2; background:rgba(0,0,0,0.55); color:#fff;
-    font-family:var(--display); font-weight:600; font-size:0.56rem; letter-spacing:0.14em;
-    text-transform:uppercase; text-align:center; display:none;
-  }
-  body.about-edit .portrait:hover .edit-hint, body.about-edit .photo-box:hover .edit-hint{ display:block; }
-
-  body:not(.about-edit) .placeholder-note,
-  body:not(.about-edit) .facts-hint,
-  body:not(.about-edit) .card.is-empty{ display:none; }
-
-  /* ── toolbars ── */
-  .toolbar{ position:fixed; bottom:26px; right:26px; display:flex; align-items:center; gap:12px; z-index:200; }
-  body.view-gallery .about-toolbar{ display:none; }
-  .gallery-toolbar{ display:none; }
-  body.view-gallery .gallery-toolbar{ display:flex; }
-
-  .save-dot{ font-family:var(--display); font-weight:600; font-size:0.56rem; letter-spacing:0.14em;
-    text-transform:uppercase; color:var(--faint); display:none; }
-  body.about-edit .save-dot{ display:inline; }
-  .edit-toggle{
-    width:46px; height:46px; border-radius:50%; border:none; cursor:pointer; background:var(--ink); color:#fff;
-    font-size:1.05rem; display:flex; align-items:center; justify-content:center;
-    box-shadow:0 3px 12px rgba(0,0,0,0.22); transition:background .2s;
-  }
-  .edit-toggle:hover{ background:#000; }
-  body.about-edit .edit-toggle{ background:#c0392b; }
-  .backup-btn{
-    display:none; width:40px; height:40px; border-radius:50%; border:none; cursor:pointer; background:#555;
-    color:#fff; font-size:1.05rem; align-items:center; justify-content:center;
-    box-shadow:0 3px 12px rgba(0,0,0,0.22); transition:background .2s;
-  }
-  body.about-edit .backup-btn{ display:flex; }
-  .backup-btn:hover{ background:#333; }
-
-  /* ── highlight-to-recolor palette (Lor's World) ── */
-  .color-pop{
-    position:fixed; z-index:400; display:none; gap:6px; align-items:center; background:#fff;
-    border:1px solid var(--line); border-radius:9px; box-shadow:0 8px 26px rgba(0,0,0,0.16); padding:7px 9px;
-  }
-  .color-pop.show{ display:flex; }
-  .color-pop .sw{ width:20px; height:20px; border-radius:50%; border:1px solid rgba(0,0,0,0.14); cursor:pointer; transition:transform .12s; padding:0; }
-  .color-pop .sw:hover{ transform:scale(1.18); }
-  .color-pop .sw.reset{ background:#fff; color:#999; display:flex; align-items:center; justify-content:center; font-size:13px; line-height:1; }
-
-  @media (max-width:860px){
-    .grid{ grid-template-columns:1fr; }
-    .rail{ border-right:none; border-bottom:1px solid var(--line); }
-    .rail nav{ flex-direction:row; flex-wrap:wrap; gap:6px 4px; }
-    .rail .nav-btn{ border-left:none; border-bottom:2px solid transparent; padding:8px 12px; }
-    .rail .nav-btn:hover, .rail .nav-btn.active{ border-left:none; border-bottom-color:var(--ink); }
-    .rail .submenu{ position:static; opacity:1; visibility:visible; transform:none; box-shadow:none; border:none; padding:0 0 0 18px; min-width:0; display:none; }
-    .rail .has-sub.open .submenu{ display:flex; }
-    .body{ padding:50px 34px 80px; }
-    .gallery-wrap{ padding:40px 24px 70px; }
-    .intro{ flex-direction:column; }
-    .portrait{ width:100%; height:300px; }
-    .facts{ grid-template-columns:repeat(2, 1fr); gap:24px 18px; }
-  }
-  @media (max-width:520px){ .facts{ grid-template-columns:1fr; } }
-</style>
+    /* highlight-to-color tool */
+    .colorbar { position: fixed; top: 16px; right: 16px; z-index: 30; display: flex; align-items: center; gap: 12px;
+      padding: 9px 9px 9px 15px; border-radius: 999px; background: rgba(255,255,255,.9); backdrop-filter: blur(8px);
+      box-shadow: 0 10px 30px rgba(90,40,90,.24); font-size: 12px; color: #6a3f68; letter-spacing: .02em; }
+    .colorbar input[type=color] { width: 34px; height: 34px; border: none; border-radius: 50%; background: none; padding: 0; cursor: pointer; }
+    .colorbar input[type=range] { width: 120px; accent-color: #c563bf; }
+    #ttl, #sub { cursor: text; }
+    #ttl:focus, #sub:focus { outline: none; }
+  </style>
 </head>
 <body>
-  <div class="grid">
+  <header id="hdr" style="transform: translate(0px, 8px)">
+    <h1 id="ttl" style="font-size:47px; font-weight:700; letter-spacing:6px">Welcome to lorelai<span style="color:#ff7485">b</span><span style="color:#ff9868">l</span><span style="color:#ffe159">u</span><span style="color:#cdff73">m</span><span style="color:#72d6f2">e</span>.com!</h1>
+    <p id="sub" style="font-size:18px; font-weight:700">choose your adventure</p>
+  </header>
 
-    <!-- ══ LEFT RAIL ══ -->
-    <aside class="rail">
-      <div class="name" data-edit="name" data-multiline="1">Lorelai<br>Blume</div>
-      <nav>
-        <button class="nav-btn active" id="aboutMeBtn" type="button">About Me</button>
-
-        <div class="has-sub">
-          <button class="nav-btn" type="button">Explore My <strong>Art</strong> <span class="caret">▸</span></button>
-          <div class="submenu">
-            <button class="nav-btn" type="button" data-category="digital">Digital Art</button>
-            <button class="nav-btn" type="button" data-category="drawings">Drawings</button>
-            <button class="nav-btn" type="button" data-category="watercolor">Watercolor</button>
-          </div>
-        </div>
-
-        <button class="nav-btn" type="button" data-category="film">Explore My <strong>Films</strong></button>
-
-        <div class="has-sub">
-          <button class="nav-btn" type="button">Explore the <strong>Workshop</strong> <span class="caret">▸</span></button>
-          <div class="submenu">
-            <a class="nav-btn" href="/editors">Editors</a>
-            <a class="nav-btn" href="https://github.com/lorelaiblume/Gallery" target="_blank" rel="noopener">GitHub Repository</a>
-          </div>
-        </div>
-
-        <a class="nav-btn" href="world/roam.html" id="worldNav">Explore <span class="rainbow"><span style="color:#ef5f52">L</span><span style="color:#f2953f">o</span><span style="color:#f3c04f">r</span><span style="color:#f3c04f">'</span><span style="color:#a2dd57">s</span> <span style="color:#68c6ef">W</span><span style="color:#5b93e8">o</span><span style="color:#b98cf2">r</span><span style="color:#cd7fe0">l</span><span style="color:#d98fdf">d</span></span></a>
-      </nav>
-    </aside>
-
-    <!-- ══ CONTENT ══ -->
-    <div class="content">
-
-      <!-- ── ABOUT VIEW ── -->
-      <section class="view-about-section">
-        <div class="body">
-          <div class="intro">
-            <div class="portrait empty" id="portrait">
-              <span class="ph-label">Portrait</span>
-              <span class="edit-hint">Click to upload</span>
-            </div>
-            <div>
-              <h1 class="welcome-title" data-edit="headline">Welcome to lorelaiblume.com!!!</h1>
-              <p class="bio" data-edit="bio">I created this website, along with my interactive 3D version of it titled "Lor's World" through vibe-coding with Claude! My dad, a software engineer of 33 years, has been teaching me about the structure of websites and how they are built. Additionally, I've been learning how to collaborate with AI to bring my original ideas to life.  I hope you enjoy exploring my portfolio! Go check out Lor's World for an interactive version of what you see here :)<br>- Lorelai &lt;3</p>
-              <p class="placeholder-note">click the text to rewrite it · click the portrait to add a photo</p>
-            </div>
-          </div>
-
-          <hr class="divider" />
-          <h2 class="about-title" data-edit="aboutTitle">A little bit about me...</h2>
-          <div class="facts" id="facts"><!-- cards injected by JS --></div>
-          <p class="facts-hint">turn on edit mode (pencil, bottom-right) to add photos &amp; notes</p>
-        </div>
-      </section>
-
-      <!-- ── GALLERY VIEW (Digital / Watercolor / Drawings / Film) ── -->
-      <section class="view-gallery-section">
-        <div class="gallery-wrap">
-          <div class="upload-area hidden" id="uploadArea">
-            <input type="file" id="fileInput" accept="image/*,.pdf" multiple hidden />
-            <p>Drop images or PDFs here</p>
-            <button id="browseBtn">Browse Files</button>
-            <button id="bulkImportBtn">Bulk Import from This Browser</button>
-          </div>
-          <div class="gallery" id="gallery">
-            <div class="loading" id="loadingMsg">Loading...</div>
-          </div>
-        </div>
-      </section>
-
-    </div>
+  <div class="colorbar" id="colorbar" style="display:none">
+    <input type="color" id="colorPick" value="#4a2f49" title="Highlight text, then pick a color" />
+    <span>Spacing</span>
+    <input type="range" id="spacePick" min="-4" max="70" step="1" title="Top-line letter spacing" />
   </div>
 
-  <!-- hidden file inputs (about photos) -->
-  <input type="file" id="portraitInput" accept="image/*" hidden />
-  <input type="file" id="cardInput" accept="image/*" hidden />
-
-  <!-- highlight-to-recolor palette -->
-  <div class="color-pop" id="colorPop">
-    <button class="sw" data-color="#ef5f52" style="background:#ef5f52"></button>
-    <button class="sw" data-color="#f2953f" style="background:#f2953f"></button>
-    <button class="sw" data-color="#f3c04f" style="background:#f3c04f"></button>
-    <button class="sw" data-color="#a2dd57" style="background:#a2dd57"></button>
-    <button class="sw" data-color="#68c6ef" style="background:#68c6ef"></button>
-    <button class="sw" data-color="#b98cf2" style="background:#b98cf2"></button>
-    <button class="sw reset" data-color="reset" title="Clear colors">×</button>
+  <div class="cards">
+    <a class="card" href="world/roam.html">
+      <div class="viz"><div id="loading">waking the dog…</div><canvas id="dog"></canvas></div>
+      <div class="label">Explore Lor's 3D World <span class="arrow">→</span></div>
+    </a>
+    <a class="card" href="about-page.html">
+      <div class="viz"><img src="assets/skater.png" alt="Explore the website" /></div>
+      <div class="label">Explore Website <span class="arrow">→</span></div>
+    </a>
   </div>
 
-  <!-- about toolbar -->
-  <div class="toolbar about-toolbar">
-    <span class="save-dot" id="saveDot">Saved</span>
-    <button class="backup-btn" id="backupBtn" title="Download a backup of your photos & text">⤓</button>
-    <button class="edit-toggle" id="editToggle" title="Edit page">✎</button>
-  </div>
+  <script>
+  // ── heading: keep saved edits, add highlight-to-color ──
+  (function(){
+    const KEY = 'lorelai-landing-header';
+    const hdr = document.getElementById('hdr'), ttl = document.getElementById('ttl'), sub = document.getElementById('sub');
+    const EDIT = new URLSearchParams(location.search).has('edit');
+    if (!EDIT) return;                       // public sees the baked heading; add ?edit to the URL to tweak
+    document.getElementById('colorbar').style.display = 'flex';
+    let st = {};
+    try { st = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) {}
 
-  <!-- gallery toolbar (Firebase edit + QR) -->
-  <div class="toolbar gallery-toolbar" id="galleryToolbar">
-    <a class="toolbar-btn" id="editLink" href="?edit" title="Add art">✎</a>
-    <button class="toolbar-btn" id="qrBtn" title="Share on phone">⬡</button>
-  </div>
+    // preserve your earlier text/size/boldness/position changes
+    if (st.size1)   ttl.style.fontSize   = st.size1 + 'px';
+    if (st.weight1) ttl.style.fontWeight = st.weight1;
+    if (st.size2)   sub.style.fontSize   = st.size2 + 'px';
+    if (st.weight2) sub.style.fontWeight = st.weight2;
+    if (st.x != null || st.y != null) hdr.style.transform = `translate(${st.x||0}px, ${st.y||0}px)`;
+    if (st.titleHTML) ttl.innerHTML = st.titleHTML; else if (st.title) ttl.textContent = st.title;
+    if (st.subHTML)   sub.innerHTML = st.subHTML;   else if (st.sub)   sub.textContent = st.sub;
 
-  <!-- QR modal -->
-  <div class="modal-overlay hidden" id="qrModal">
-    <div class="modal qr-only"><div id="qrCode"></div></div>
-  </div>
+    // top-line letter spacing
+    const spacing = ('spacing1' in st) ? st.spacing1 : 14;
+    ttl.style.letterSpacing = spacing + 'px';
+    const sp = document.getElementById('spacePick'); sp.value = spacing;
 
-  <!-- App modal -->
-  <div class="app-modal hidden" id="appModal">
-    <div class="app-modal-inner">
-      <div class="app-modal-header">
-        <h2 id="appModalTitle"></h2>
-        <button class="app-close" id="appClose">×</button>
-      </div>
-      <div class="app-stage-wrap" id="appStageWrap"><div class="app-stage" id="appStage"></div></div>
-    </div>
-  </div>
+    // editable so you can select letters/phrases (and still edit the words)
+    [ttl, sub].forEach(elm => { elm.contentEditable = 'true'; elm.spellcheck = false; });
+    function save(){ st.titleHTML = ttl.innerHTML; st.subHTML = sub.innerHTML; localStorage.setItem(KEY, JSON.stringify(st)); }
+    ttl.addEventListener('input', save); sub.addEventListener('input', save);
+    sp.addEventListener('input', e => { st.spacing1 = +e.target.value; ttl.style.letterSpacing = st.spacing1 + 'px'; save(); });
 
-  <!-- Film player modal -->
-  <div class="film-modal hidden" id="filmModal">
-    <div class="film-modal-inner">
-      <div class="film-modal-header">
-        <h2 id="filmPlayerTitle"></h2>
-        <label class="commentary-toggle hidden" id="commentaryToggleLabel">
-          <input type="checkbox" id="commentaryToggle" checked />
-          Director's Commentary
-        </label>
-        <button class="film-close" id="filmClose">×</button>
-      </div>
-      <div class="film-player-wrap">
-        <video id="filmVideo" controls playsinline></video>
-        <div class="commentary-display" id="commentaryDisplay">
-          <div class="commentary-accent"></div>
-          <p class="commentary-text" id="commentaryText"></p>
-        </div>
-      </div>
-      <div class="film-editor-panel hidden" id="filmEditorPanel">
-        <div class="film-editor-title-row">
-          <input id="filmTitleEdit" class="film-editor-title-input" placeholder="Film title" />
-        </div>
-        <div class="film-editor-add">
-          <textarea id="newCommentText" placeholder="Director's note…" rows="2"></textarea>
-          <button id="addCommentAtBtn">Add note at 0:00</button>
-        </div>
-        <div class="film-editor-list" id="editorCommentList"></div>
-      </div>
-    </div>
-  </div>
+    // remember the last text selection made inside the heading
+    let range = null;
+    document.addEventListener('selectionchange', () => {
+      const sel = window.getSelection();
+      if (sel.rangeCount && !sel.isCollapsed && hdr.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+        range = sel.getRangeAt(0).cloneRange();
+      }
+    });
 
-<script>
-/* ═══════════ ABOUT-PAGE editor (localStorage) ═══════════ */
-(function(){
-  var STORE_KEY = 'lb_about_v3';
-  var facts = document.getElementById('facts');
-  var portrait = document.getElementById('portrait');
-  var portraitInput = document.getElementById('portraitInput');
-  var cardInput = document.getElementById('cardInput');
-  var editToggle = document.getElementById('editToggle');
-  var saveDot = document.getElementById('saveDot');
+    // pick a color → recolor the highlighted text
+    document.getElementById('colorPick').addEventListener('input', e => {
+      if (!range || range.collapsed) return;
+      const span = document.createElement('span'); span.style.color = e.target.value;
+      try { range.surroundContents(span); }
+      catch (err) { span.appendChild(range.extractContents()); range.insertNode(span); }
+      save();
+    });
+  })();
+  </script>
 
-  var defaults = {
-    name: 'Lorelai<br>Blume',
-    headline: document.querySelector('[data-edit="headline"]').innerHTML,
-    bio: document.querySelector('.bio').innerHTML,
-    aboutTitle: document.querySelector('[data-edit="aboutTitle"]').textContent,
-    portrait: null,
-    cards: [ { img:null, text:'' }, { img:null, text:'' }, { img:null, text:'' } ]
-  };
-  var state = load() || JSON.parse(JSON.stringify(defaults));
+  <script type="importmap">
+  { "imports": {
+      "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/"
+  } }
+  </script>
+  <script type="module">
+  import * as THREE from 'three';
+  import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+  import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
-  function load(){ try{ var r = localStorage.getItem(STORE_KEY); return r ? JSON.parse(r) : null; }catch(e){ return null; } }
-  var saveTimer;
-  function save(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); flashSaved(); }catch(e){} }
-  function scheduleSave(){ clearTimeout(saveTimer); saveTimer = setTimeout(save, 500); }
-  function flashSaved(){ saveDot.textContent='Saved'; saveDot.style.opacity=1; clearTimeout(flashSaved._t); flashSaved._t=setTimeout(function(){ saveDot.style.opacity=.4; },900); }
+  const canvas = document.getElementById('dog');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.1;
 
-  function applyStatics(){
-    var nameEl = document.querySelector('[data-edit="name"]');
-    var headEl = document.querySelector('[data-edit="headline"]');
-    var bioEl  = document.querySelector('[data-edit="bio"]');
-    var titEl  = document.querySelector('[data-edit="aboutTitle"]');
-    if((state.headline === undefined || state.headline === null) && state.bio){
-      var parts = state.bio.split(/<br\s*\/?>/i);
-      state.headline = parts.shift().trim();
-      state.bio = parts.join('<br>').replace(/^\s+/, '');
-      scheduleSave();
+  const scene = new THREE.Scene();
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+  const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+  camera.position.set(0, 3.0, 8.4);
+
+  scene.add(new THREE.HemisphereLight(0xffffff, 0xe7b9d6, 0.9));
+  const key = new THREE.DirectionalLight(0xfff4ea, 1.2); key.position.set(4, 7, 5); scene.add(key);
+  const fill = new THREE.DirectionalLight(0xbfd4ff, 0.35); fill.position.set(-4, 2, -3); scene.add(fill);
+
+  // ── rainbow-striped disc (rainbow-bridge colours, diagonal print) ──
+  function stripeTexture(){
+    const S = 512, c = document.createElement('canvas'); c.width = c.height = S;
+    const g = c.getContext('2d');
+    const COLORS = ['#6a86ef','#56c5f1','#a9e05a','#f6b74a','#f0794c','#ef5566'];
+    const n = COLORS.length;
+    g.save();
+    g.translate(S/2, S/2); g.rotate(-Math.PI * 0.28); g.translate(-S/2, -S/2);
+    const bw = S / 6;                                    // thin stripes (unchanged)
+    const start = (S - bw*n) / 2;                        // one centred rainbow
+    const bounds = []; for (let i = 0; i <= n; i++) bounds.push(start + i*bw);
+    bounds[0] = -6*S; bounds[n] = 7*S;                   // clamp ends: blue one way, red the other — no stray band
+    for (let i = 0; i < n; i++){
+      g.fillStyle = COLORS[i];
+      g.fillRect(bounds[i], -6*S, bounds[i+1] - bounds[i], 13*S);
     }
-    if(state.name) nameEl.innerHTML = state.name;
-    if(state.headline != null) headEl.innerHTML = state.headline;
-    if(state.bio != null) bioEl.innerHTML = state.bio;
-    if(state.aboutTitle) titEl.textContent = state.aboutTitle;
-    setPortrait(state.portrait);
+    g.restore();
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+    return t;
   }
-  function setPortrait(u){
-    if(u){ portrait.classList.remove('empty'); portrait.style.backgroundImage='url('+u+')'; portrait.querySelector('.ph-label').style.display='none'; }
-    else { portrait.classList.add('empty'); portrait.style.backgroundImage=''; portrait.querySelector('.ph-label').style.display=''; }
+  const R = 2.0, TH = 0.30;
+  // one solid disc, textured with a top-down (planar) projection so the stripes
+  // wrap over the top AND straight down the band
+  const geo = new THREE.CylinderGeometry(R, R, TH, 160, 1, false);
+  const pos = geo.attributes.position, uv = new Float32Array(pos.count * 2);
+  for (let i = 0; i < pos.count; i++){
+    uv[i*2]   = (pos.getX(i) + R) / (2*R);
+    uv[i*2+1] = (pos.getZ(i) + R) / (2*R);
   }
+  geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  const tex = stripeTexture(); tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+  const disc = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+    map: tex, roughness: 0.5, metalness: 0, toneMapped: false }));
+  scene.add(disc);
 
-  document.querySelectorAll('[data-edit]').forEach(function(el){
-    el.addEventListener('input', function(){
-      var key = el.getAttribute('data-edit');
-      if(key === 'aboutTitle') state[key] = el.textContent; else state[key] = el.innerHTML;
-      scheduleSave();
-    });
-    el.addEventListener('keydown', function(e){
-      if(e.key==='Enter' && !el.hasAttribute('data-multiline') && el.getAttribute('data-edit')!=='bio'){ e.preventDefault(); el.blur(); }
-    });
+  // ── balloon dog ──
+  const dogSpin = new THREE.Group(); scene.add(dogSpin);
+  new GLTFLoader().load('editors/dog.glb', (gltf) => {
+    let mesh = null; gltf.scene.traverse(o => { if (o.isMesh) mesh = o; });
+    mesh.geometry.computeVertexNormals();
+    mesh.material = new THREE.MeshStandardMaterial({ color: 0xef5aa8, roughness: 0.35, metalness: 0.05 });
+    const box = new THREE.Box3().setFromObject(mesh);
+    const size = new THREE.Vector3(); box.getSize(size);
+    const c = new THREE.Vector3(); box.getCenter(c);
+    mesh.position.set(-c.x, -box.min.y, -c.z);
+    const holder = new THREE.Group(); holder.add(mesh);
+    holder.scale.setScalar(2.3 / size.y);
+    holder.position.y = TH / 2;                     // feet on the striped top
+    dogSpin.add(holder);
+    document.getElementById('loading').style.display = 'none';
   });
 
-  function render(){
-    facts.innerHTML='';
-    state.cards.forEach(function(card, i){
-      var empty = !card.img && !String(card.text||'').trim();
-      var el = document.createElement('div');
-      el.className = 'card' + (empty ? ' is-empty':'');
-
-      var del = document.createElement('button');
-      del.className='card-del'; del.type='button'; del.innerHTML='×'; del.title='Delete';
-      del.addEventListener('click', function(ev){ ev.stopPropagation(); state.cards.splice(i,1); save(); render(); });
-      el.appendChild(del);
-
-      var box = document.createElement('div');
-      box.className = 'photo-box' + (card.img ? ' filled':'');
-      if(card.img){ var img=document.createElement('img'); img.src=card.img; box.appendChild(img); }
-      else { var ph=document.createElement('div'); ph.className='card-ph'; ph.innerHTML='<span class="ic">◇</span><span class="tx">Add photo</span>'; box.appendChild(ph); }
-      var hint=document.createElement('div'); hint.className='edit-hint'; hint.textContent=card.img?'Click to replace':'Click to upload'; box.appendChild(hint);
-      box.addEventListener('click', function(){ if(!document.body.classList.contains('about-edit')) return; pendingCard=i; cardInput.value=''; cardInput.click(); });
-      el.appendChild(box);
-
-      var cap = document.createElement('div');
-      cap.className='cap'; cap.setAttribute('data-ph','write a message…'); cap.textContent = card.text||'';
-      if(document.body.classList.contains('about-edit')) cap.setAttribute('contenteditable','true');
-      cap.addEventListener('input', function(){ state.cards[i].text = cap.textContent; scheduleSave(); });
-      el.appendChild(cap);
-
-      facts.appendChild(el);
-    });
-    var add = document.createElement('button');
-    add.className='add-tile'; add.type='button'; add.textContent='＋ Add photo';
-    add.addEventListener('click', function(){ state.cards.push({img:null, text:''}); save(); render(); });
-    facts.appendChild(add);
-    applyContentEditableState();
+  function resize(){
+    const v = canvas.parentElement;
+    const w = v.clientWidth, h = v.clientHeight;
+    if (!w || !h) return;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h; camera.updateProjectionMatrix();
   }
+  resize(); addEventListener('resize', resize);
+  new ResizeObserver(resize).observe(canvas.parentElement);
 
-  var pendingCard = null;
-  function readAndResize(file, cb){
-    var reader = new FileReader();
-    reader.onload = function(e){
-      var img = new Image();
-      img.onload = function(){
-        var max=1100, w=img.width, h=img.height;
-        if(w>max||h>max){ var s=Math.min(max/w,max/h); w=Math.round(w*s); h=Math.round(h*s); }
-        var c=document.createElement('canvas'); c.width=w; c.height=h; c.getContext('2d').drawImage(img,0,0,w,h);
-        try{ cb(c.toDataURL('image/jpeg',0.82)); }catch(err){ cb(e.target.result); }
-      };
-      img.onerror=function(){ cb(e.target.result); };
-      img.src=e.target.result;
-    };
-    reader.readAsDataURL(file);
+  const clock = new THREE.Clock();
+  function animate(){
+    requestAnimationFrame(animate);
+    dogSpin.rotation.y += clock.getDelta() * 0.5;   // slow spin
+    camera.lookAt(0, 0.85, 0);
+    renderer.render(scene, camera);
   }
-  portraitInput.addEventListener('change', function(){ if(!portraitInput.files[0]) return; readAndResize(portraitInput.files[0], function(u){ state.portrait=u; setPortrait(u); save(); }); });
-  cardInput.addEventListener('change', function(){ if(!cardInput.files[0]||pendingCard===null) return; var idx=pendingCard; readAndResize(cardInput.files[0], function(u){ state.cards[idx].img=u; save(); render(); }); });
-  portrait.addEventListener('click', function(){ if(!document.body.classList.contains('about-edit')) return; portraitInput.value=''; portraitInput.click(); });
-
-  function applyContentEditableState(){
-    var on = document.body.classList.contains('about-edit');
-    document.querySelectorAll('[data-edit]').forEach(function(el){ if(on) el.setAttribute('contenteditable','true'); else el.removeAttribute('contenteditable'); });
-    facts.querySelectorAll('.cap').forEach(function(p){ if(on) p.setAttribute('contenteditable','true'); else p.removeAttribute('contenteditable'); });
-  }
-  editToggle.addEventListener('click', function(){
-    document.body.classList.toggle('about-edit');
-    var on = document.body.classList.contains('about-edit');
-    editToggle.innerHTML = on ? '✓' : '✎';
-    editToggle.title = on ? 'Done editing' : 'Edit page';
-    applyContentEditableState();
-    if(!on) save();
-  });
-  document.getElementById('backupBtn').addEventListener('click', function(){
-    try{
-      var blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a'); a.href=url; a.download='lorelaiblume-about-backup.json';
-      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-    }catch(e){ alert('Could not create the backup file.'); }
-  });
-
-  /* highlight-to-recolor for Lor's World */
-  var worldNav = document.getElementById('worldNav');
-  var pop = document.getElementById('colorPop');
-  var savedRange = null;
-  function saveWorld(){ /* live-session only for now */ }
-  function showPop(){
-    var sel = window.getSelection();
-    if(!sel || sel.isCollapsed || sel.rangeCount===0){ hidePop(); return; }
-    var range = sel.getRangeAt(0);
-    if(!worldNav.contains(range.commonAncestorContainer)){ hidePop(); return; }
-    savedRange = range.cloneRange();
-    var rect = range.getBoundingClientRect();
-    pop.classList.add('show');
-    var px = rect.left + rect.width/2 - pop.offsetWidth/2;
-    var py = rect.top - pop.offsetHeight - 8;
-    px = Math.max(8, Math.min(px, window.innerWidth - pop.offsetWidth - 8));
-    if(py < 8) py = rect.bottom + 8;
-    pop.style.left = px+'px'; pop.style.top = py+'px';
-  }
-  function hidePop(){ pop.classList.remove('show'); }
-  function applyColor(color){
-    if(!savedRange) return;
-    var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(savedRange);
-    var span = document.createElement('span'); span.style.color = color;
-    try{ savedRange.surroundContents(span); }catch(e){ var f=savedRange.extractContents(); span.appendChild(f); savedRange.insertNode(span); }
-    sel.removeAllRanges();
-  }
-  document.addEventListener('mouseup', function(){ setTimeout(showPop,0); });
-  document.addEventListener('keyup', function(){ setTimeout(showPop,0); });
-  window.addEventListener('scroll', hidePop, true);
-  pop.addEventListener('mousedown', function(e){ e.preventDefault(); });
-  pop.querySelectorAll('.sw').forEach(function(sw){
-    sw.addEventListener('click', function(){ var c=sw.getAttribute('data-color'); if(c==='reset'){ worldNav.textContent=worldNav.textContent; } else applyColor(c); hidePop(); });
-  });
-
-  applyStatics();
-  render();
-})();
-
-/* ═══════════ RAIL: submenus + view switching ═══════════ */
-(function(){
-  var subs = document.querySelectorAll('.rail .has-sub');
-  subs.forEach(function(sub){
-    var btn = sub.querySelector(':scope > .nav-btn');
-    btn.addEventListener('click', function(e){
-      e.preventDefault();
-      subs.forEach(function(o){ if(o!==sub) o.classList.remove('open'); });
-      sub.classList.toggle('open'); btn.blur();
-    });
-  });
-  document.addEventListener('click', function(e){
-    subs.forEach(function(sub){ if(!sub.contains(e.target)) sub.classList.remove('open'); });
-  });
-
-  var aboutBtn = document.getElementById('aboutMeBtn');
-  var catBtns = document.querySelectorAll('.nav-btn[data-category]');
-  function clearActive(){
-    aboutBtn.classList.remove('active');
-    document.querySelectorAll('.rail .nav-btn').forEach(function(b){ b.classList.remove('active'); });
-  }
-  aboutBtn.addEventListener('click', function(){
-    document.body.classList.remove('view-gallery');
-    clearActive(); aboutBtn.classList.add('active');
-    subs.forEach(function(s){ s.classList.remove('open'); });
-    window.scrollTo(0,0);
-  });
-  catBtns.forEach(function(b){
-    b.addEventListener('click', function(){
-      document.body.classList.add('view-gallery');
-      clearActive();
-      b.classList.add('active');
-      var parent = b.closest('.has-sub');
-      if(parent){ var pBtn = parent.querySelector(':scope > .nav-btn'); if(pBtn) pBtn.classList.add('active'); }
-      subs.forEach(function(s){ s.classList.remove('open'); });
-      window.scrollTo(0,0);
-    });
-  });
-})();
-</script>
-
-<!-- Firebase + gallery engine -->
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="app.js"></script>
+  animate();
+  </script>
 </body>
 </html>
