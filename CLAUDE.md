@@ -10,7 +10,7 @@ Firebase project: `lorelai-blume-gallery`
 The bash sandbox cannot reach GitHub (network restriction), so `git push` must be run by Lorelai in a local terminal:
 
 ```
-cd ~/Desktop/dev/lorelaiblume && git push origin main
+cd ~/dev/lorelaiblume && git push origin main
 ```
 
 Deploy takes ~30–60 seconds after push. No build step — static files are served directly.
