@@ -11,7 +11,9 @@
     #app { position: fixed; inset: 0; }
     canvas { display: block; }
     #loading { position: fixed; inset: 0; display: grid; place-items: center; z-index: 20;
-               font-size: 14px; color: #a24b7d; }
+               font-size: 14px; color: #a24b7d; background: #f9e0ef;
+               transition: opacity 0.35s ease; }
+    #loading.done { opacity: 0; pointer-events: none; }
     .caption { position: fixed; left: 50%; top: 18px; transform: translateX(-50%);
       z-index: 10; color: #a24b7d; font-size: 13px; letter-spacing: .03em; background: rgba(255,255,255,0.5);
       padding: 6px 14px; border-radius: 20px; }
@@ -38,7 +40,21 @@
   <script type="module">
   import * as THREE from 'three';
   import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+  import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
   import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+  // ── loading: one shared manager, so the overlay lifts only once EVERY model is in ──
+  const loadManager = new THREE.LoadingManager();
+  loadManager.onLoad = () => {
+    // wait one frame so the first render (with everything in place) happens under the overlay
+    requestAnimationFrame(() => document.getElementById('loading').classList.add('done'));
+  };
+  loadManager.onError = (url) => console.error('Failed to load', url);
+  function makeLoader(){
+    const l = new GLTFLoader(loadManager);
+    l.setMeshoptDecoder(MeshoptDecoder);   // rocket.glb is meshopt-compressed
+    return l;
+  }
 
   // ── renderer / scene ──
   const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -339,7 +355,7 @@
   })();
 
   // ── color palette on the halo next to the popcorn (halo #0): saved colors, glowing blue portal ──
-  new GLTFLoader().load('../editors/color-palette.glb', (gltf) => {
+  makeLoader().load('../editors/color-palette.glb', (gltf) => {
     const pal = gltf.scene;
     const brush = pal.getObjectByName('brush'); if (brush) brush.removeFromParent();   // just the palette
 
@@ -383,7 +399,7 @@
   });
 
   // ── rocket ship on the halo to the popcorn's left (halo #3), BIG ──
-  new GLTFLoader().load('rocket.glb', (gltf) => {
+  makeLoader().load('rocket.glb', (gltf) => {
     const rocket = gltf.scene;
     rocket.traverse(o => { if (o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
 
@@ -485,7 +501,7 @@
     a.needsUpdate=true;
   }
 
-  new GLTFLoader().load('../editors/dog.glb', (gltf) => {
+  makeLoader().load('../editors/dog.glb', (gltf) => {
     const root = gltf.scene;
     root.traverse(o => { if (o.isMesh) dogMesh = o; });
     // smooth once
@@ -504,7 +520,6 @@
     model.rotation.y = FACE;
 
     computeLegData();
-    document.getElementById('loading').style.display = 'none';
   });
 
   // ================= controls =================
