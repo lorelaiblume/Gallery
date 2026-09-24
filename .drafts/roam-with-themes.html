@@ -56,19 +56,6 @@
       #stylePanel.open { transform: translateY(0); }
       #stylePanel .swatches { grid-template-columns: repeat(11, 1fr); }
     }
-    #musicPanel { position: fixed; left: 16px; bottom: 40px; width: 340px; max-width: calc(100vw - 32px); z-index: 24;
-      background: rgba(255,255,255,0.72); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-      border-radius: 18px; box-shadow: 0 10px 40px rgba(162,75,125,0.25); padding: 8px 8px 8px; color: #a24b7d;
-      transform: translateY(calc(100% + 60px)); transition: transform .45s cubic-bezier(.2,.9,.3,1.2); }
-    #musicPanel.open { transform: translateY(0); }
-    #musicPanel .mhead { display: flex; justify-content: space-between; align-items: center; padding: 2px 6px 7px;
-      font: italic 700 15px/1 Georgia, serif; }
-    #musicPanel .mhead button { border: 0; background: rgba(162,75,125,0.12); color: #a24b7d; width: 24px; height: 24px;
-      border-radius: 50%; margin-left: 5px; cursor: pointer; font: 700 14px/1 -apple-system, sans-serif; }
-    #mBody { border-radius: 12px; overflow: hidden; min-height: 80px; }
-    #mBody iframe { display: block; border: 0; }
-    #muteBtn { position: fixed; right: 16px; top: 12px; z-index: 22; width: 38px; height: 38px; border-radius: 50%;
-      border: 0; background: rgba(255,255,255,0.55); font-size: 17px; line-height: 1; cursor: pointer; }
     #flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none;
       transition: opacity 0.8s ease; z-index: 50; }
   </style>
@@ -79,11 +66,6 @@
   <div class="caption" id="caption">WASD to walk · shift to run · drag to look around · space to jump · scroll to zoom · V: overview</div>
   <div id="stick"><i></i></div>
   <button id="jumpBtn">JUMP</button>
-  <button id="muteBtn">🔊</button>
-  <div id="musicPanel" aria-hidden="true">
-    <div class="mhead"><span>♪ lorelai fm</span><span><button id="mMin" title="shrink / expand">–</button><button id="mClose" title="turn the music off">×</button></span></div>
-    <div id="mBody"></div>
-  </div>
   <div id="stylePanel" aria-hidden="true">
     <h2>style your pup</h2>
     <div class="sec"><span>color</span><div class="swatches" id="swatches"></div></div>
@@ -106,7 +88,10 @@
   import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
   import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
   import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-  import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+  import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+  import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+  import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+  import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
   // ── loading: one shared manager, so the overlay lifts only once EVERY model is in ──
   const loadManager = new THREE.LoadingManager();
@@ -152,23 +137,23 @@
   const SUN_OFF = new THREE.Vector3(30, 50, 20).normalize().multiplyScalar(250);   // sun + shadow box follow the dog
 
   // ── the dish: a small finite pink disk floating in the pale-pink void ──
-  const DISH_R = 110, DISH_TH = 12;
+  const DISH_R = 150, DISH_TH = 12;
   const dish = new THREE.Group();
   const dishTop = new THREE.Mesh(
     new THREE.CircleGeometry(DISH_R, 96),
     new THREE.MeshBasicMaterial({ color: PINK }));
-  dishTop.rotation.x = -Math.PI/2; dish.add(dishTop);
+  dishTop.rotation.x = -Math.PI/2; dishTop.name = 'floor'; dish.add(dishTop);
   const dishSide = new THREE.Mesh(
     new THREE.CylinderGeometry(DISH_R, DISH_R, DISH_TH, 96, 1, true),
     new THREE.MeshBasicMaterial({ color: 0xd23f6d, side: THREE.DoubleSide }));  // darker rim = depth
-  dishSide.position.y = -DISH_TH/2; dish.add(dishSide);
+  dishSide.position.y = -DISH_TH/2; dishSide.name = 'rim'; dish.add(dishSide);
   const dishBottom = new THREE.Mesh(
     new THREE.CircleGeometry(DISH_R, 96),
     new THREE.MeshBasicMaterial({ color: 0xc23a64 }));
-  dishBottom.rotation.x = Math.PI/2; dishBottom.position.y = -DISH_TH; dish.add(dishBottom);
+  dishBottom.rotation.x = Math.PI/2; dishBottom.position.y = -DISH_TH; dishBottom.name = 'under'; dish.add(dishBottom);
   scene.add(dish);
 
-  // ================= atmosphere: sky + fog =================
+  // ================= atmosphere: sky, fog, sparkles =================
   const SKY_TOP = new THREE.Color(0xc9d3ff), SKY_HORIZON = new THREE.Color(SPACE), SKY_BELOW = new THREE.Color(0xf3c6de);
   scene.background = SKY_HORIZON.clone();
   scene.fog = new THREE.Fog(SKY_HORIZON, 200, 900);      // near/far re-tuned every frame from the camera distance
@@ -186,16 +171,40 @@
                            : mix(horizon, below, smoothstep(0.0, 0.6, -h));
           gl_FragColor = vec4(c, 1.0); }`
       }));
-    sky.renderOrder = -1; sky.frustumCulled = false; scene.add(sky);
+    sky.renderOrder = -1; sky.frustumCulled = false; sky.name = 'sky'; scene.add(sky);
     // keep the sky centred on the camera so you can never reach its edge
     sky.onBeforeRender = (r, sc, cam) => sky.position.copy(cam.position);
   }
 
+  const sparkles = (() => {
+    const N = 260, pos = new Float32Array(N*3), spd = new Float32Array(N);
+    for (let i = 0; i < N; i++){
+      const r = Math.sqrt(Math.random()) * DISH_R * 1.05, a = Math.random()*Math.PI*2;
+      pos[i*3] = Math.cos(a)*r; pos[i*3+1] = Math.random()*70; pos[i*3+2] = Math.sin(a)*r;
+      spd[i] = 1.5 + Math.random()*3;
+    }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.3, 'rgba(255,230,245,0.8)'); gr.addColorStop(1, 'rgba(255,230,245,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+    const pts = new THREE.Points(geo, new THREE.PointsMaterial({ size: 1.6, map: new THREE.CanvasTexture(c),
+      transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true }));
+    scene.add(pts);
+    return { pts, pos, spd, N };
+  })();
+
   function updateAtmosphere(dt, t, camDistNow){
+    const { pos, spd, N } = sparkles;
+    for (let i = 0; i < N; i++){
+      pos[i*3+1] += spd[i] * dt;
+      pos[i*3]   += Math.sin(t*0.7 + i) * 0.6 * dt;
+      if (pos[i*3+1] > 70) pos[i*3+1] = 0;
+    }
+    sparkles.pts.geometry.attributes.position.needsUpdate = true;
     // fog follows the zoom: gentle haze in the play view, still clear in the overview
     scene.fog.near = camDistNow * 0.9 + 140;
     scene.fog.far  = camDistNow * 1.3 + 950;
-    waterUniforms.time.value = t;
   }
 
   // soft contact shadow on the dish top
@@ -243,7 +252,6 @@
     }
     makeHalo(0, 0);                                  // center
     for (let i = 0; i < 5; i++){                     // evenly spaced on the loop path
-      if (i === 3) continue;                          // halo #3 is where the boombox sits
       const a = (i/5)*Math.PI*2 - Math.PI/2;         // first one at the top
       makeHalo(Math.cos(a)*PATH_R, Math.sin(a)*PATH_R);
     }
@@ -310,12 +318,12 @@
   const isleTop = (function buildIsland(){
     const g = new THREE.Group(); g.position.copy(ISLE_C);
     const top = new THREE.Mesh(new THREE.CircleGeometry(ISLE_R, 96), new THREE.MeshBasicMaterial({ color: PINK }));
-    top.rotation.x = -Math.PI/2; g.add(top);
+    top.rotation.x = -Math.PI/2; top.name = 'floor'; g.add(top);
     const side = new THREE.Mesh(new THREE.CylinderGeometry(ISLE_R, ISLE_R, DISH_TH, 96, 1, true),
       new THREE.MeshBasicMaterial({ color: 0xd23f6d, side: THREE.DoubleSide }));
-    side.position.y = -DISH_TH/2; g.add(side);
+    side.position.y = -DISH_TH/2; side.name = 'rim'; g.add(side);
     const bottom = new THREE.Mesh(new THREE.CircleGeometry(ISLE_R, 96), new THREE.MeshBasicMaterial({ color: 0xc23a64 }));
-    bottom.rotation.x = Math.PI/2; bottom.position.y = -DISH_TH; g.add(bottom);
+    bottom.rotation.x = Math.PI/2; bottom.position.y = -DISH_TH; bottom.name = 'under'; g.add(bottom);
     const catcher = new THREE.Mesh(new THREE.CircleGeometry(ISLE_R, 96), new THREE.ShadowMaterial({ opacity: 0.13 }));
     catcher.rotation.x = -Math.PI/2; catcher.position.y = 0.05; catcher.receiveShadow = true; g.add(catcher);
     const inner = ISLE_PATH_R - PATH_W/2, band = PATH_W / RAINBOW.length;
@@ -329,11 +337,12 @@
   })();
 
   // rainbow bridge: flat across the big dish's rim, a gentle arch over the gap, flat again onto the island's loop
-  function buildBridge(DIR, GAPL, s3){
+  const bridgeTop = (function buildBridge(){
     const W = PATH_W, LANES = RAINBOW.length, laneW = W / LANES, N = 120, KEEL = 2.5, ARCH = 12;
     const s0 = PATH_R + PATH_W/2;                            // start: outer edge of the big dish's loop
-    const s1 = DISH_R, s2 = DISH_R + GAPL;                   // the gap between the dishes (s3 = where it ends)
-    const perp = new THREE.Vector3(-DIR.z, 0, DIR.x);
+    const s1 = DISH_R, s2 = DISH_R + GAP;                    // the gap between the dishes
+    const s3 = DISH_R + GAP + ISLE_R - (ISLE_PATH_R + PATH_W/2);   // end: outer edge of the island's loop
+    const perp = new THREE.Vector3(-BRIDGE_DIR.z, 0, BRIDGE_DIR.x);
     const yAt = sAlong => {
       const base = 0.14;
       if (sAlong <= s1 || sAlong >= s2) return base;
@@ -341,7 +350,7 @@
       return base + ARCH * (1 - Math.cos(u*Math.PI*2)) / 2;
     };
     const pt = (sAlong, o, dy = 0) => new THREE.Vector3(
-      DIR.x*sAlong + perp.x*o, yAt(sAlong) + dy, DIR.z*sAlong + perp.z*o);
+      BRIDGE_DIR.x*sAlong + perp.x*o, yAt(sAlong) + dy, BRIDGE_DIR.z*sAlong + perp.z*o);
     const topPos = [], topCol = [], keelPos = [], c = new THREE.Color();
     const pushQuad = (arr, a, b, q, d) => arr.push(a.x,a.y,a.z, b.x,b.y,b.z, q.x,q.y,q.z, a.x,a.y,a.z, q.x,q.y,q.z, d.x,d.y,d.z);
     for (let i = 0; i < N; i++){
@@ -365,29 +374,7 @@
     kg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(keelPos), 3));
     scene.add(new THREE.Mesh(kg, new THREE.MeshBasicMaterial({ color: 0xd23f6d, side: THREE.DoubleSide })));
     return top;
-  }
-  const bridgeTop = buildBridge(BRIDGE_DIR, GAP, DISH_R + GAP + ISLE_R - (ISLE_PATH_R + PATH_W/2));   // → portal island's loop
-
-  // ================= the park: a grassy island, reached by a second rainbow bridge =================
-  const PARK_A = (1/5)*Math.PI*2 - Math.PI/2;                // leaves from rim spot #1 (front-left of the spawn)
-  const PARK_DIR = new THREE.Vector3(Math.cos(PARK_A), 0, Math.sin(PARK_A));
-  const PARK_R = 120, PARK_GAP = 100;
-  const PARK_C = PARK_DIR.clone().multiplyScalar(DISH_R + PARK_GAP + PARK_R);
-  const parkTop = (function buildPark(){
-    const g = new THREE.Group(); g.position.copy(PARK_C);
-    const top = new THREE.Mesh(new THREE.CircleGeometry(PARK_R, 96), new THREE.MeshBasicMaterial({ color: 0x7cc466 }));
-    top.rotation.x = -Math.PI/2; top.name = 'floor'; g.add(top);
-    const side = new THREE.Mesh(new THREE.CylinderGeometry(PARK_R, PARK_R, DISH_TH, 96, 1, true),
-      new THREE.MeshBasicMaterial({ color: 0xd23f6d, side: THREE.DoubleSide }));
-    side.position.y = -DISH_TH/2; side.name = 'rim'; g.add(side);
-    const bottom = new THREE.Mesh(new THREE.CircleGeometry(PARK_R, 96), new THREE.MeshBasicMaterial({ color: 0xc23a64 }));
-    bottom.rotation.x = Math.PI/2; bottom.position.y = -DISH_TH; bottom.name = 'under'; g.add(bottom);
-    const catcher = new THREE.Mesh(new THREE.CircleGeometry(PARK_R, 96), new THREE.ShadowMaterial({ opacity: 0.13 }));
-    catcher.rotation.x = -Math.PI/2; catcher.position.y = 0.05; catcher.receiveShadow = true; g.add(catcher);
-    scene.add(g);
-    return top;
   })();
-  const parkBridgeTop = buildBridge(PARK_DIR, PARK_GAP, DISH_R + PARK_GAP + 14);   // lands a little way into the grass
 
   // ================= dog-style station: the balloon cart (behind the spawn) =================
   const stationUpdaters = [];
@@ -480,7 +467,8 @@
 
     // right behind where the dog spawns, facing the center of the dish
     const st = buildCart();
-    st.position.copy(BRIDGE_DIR).multiplyScalar(-DISH_R * 0.45);
+    st.userData.neonRemap = { id: 'cart', 0xff1a3c: 0x00f0ff, 0xff2bd6: 0x00f0ff };                              // neon: cyan stripes
+    st.position.copy(BRIDGE_DIR).multiplyScalar(-70);
     st.rotation.y = yawToward(st.position, new THREE.Vector3(0, 0, 0));
     scene.add(st);
     return st;
@@ -489,66 +477,10 @@
   const STYLE_PAD = cartStation.localToWorld(new THREE.Vector3(0, 0, 12));   // glowing pad in front of the cart
   const STYLE_FACING = cartStation.rotation.y;                               // dog faces away from the cart while styling
 
-  // ================= ocean: the dishes sit in a sea that reflects the sky =================
-  const WATER_Y = -5;
-  const waterUniforms = {
-    time: { value: 0 },
-    top: { value: SKY_TOP }, horizon: { value: SKY_HORIZON },
-    deep: { value: new THREE.Color(0x6f9fe0) },
-    sunDir: { value: SUN_OFF.clone().normalize() },
-    c1: { value: new THREE.Vector3(0, 0, DISH_R) },                 // (x, z, radius) of each island
-    c2: { value: new THREE.Vector3(ISLE_C.x, ISLE_C.z, ISLE_R) },
-    c3: { value: new THREE.Vector3(PARK_C.x, PARK_C.z, PARK_R) },
-  };
-  const ocean = new THREE.Mesh(
-    new THREE.PlaneGeometry(4400, 4400, 1, 1),
-    new THREE.ShaderMaterial({
-      uniforms: waterUniforms, fog: false,
-      vertexShader: `varying vec3 wp;
-        void main(){ vec4 w = modelMatrix * vec4(position, 1.0); wp = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`,
-      fragmentShader: `uniform float time; uniform vec3 top, horizon, deep, sunDir, c1, c2, c3; varying vec3 wp;
-        // a few crossing swells → slope of the surface → normal
-        vec2 slope(vec2 p){
-          vec2 g = vec2(0.0);
-          vec2 d; float k, a, s;
-          d = normalize(vec2( 1.0,  0.3)); k = 0.045; a = 0.9;  s = 1.1; g += d * k * a * cos(dot(d, p) * k + time * s);
-          d = normalize(vec2(-0.4,  1.0)); k = 0.07;  a = 0.55; s = 1.5; g += d * k * a * cos(dot(d, p) * k + time * s);
-          d = normalize(vec2( 0.8, -0.9)); k = 0.13;  a = 0.28; s = 2.1; g += d * k * a * cos(dot(d, p) * k + time * s);
-          d = normalize(vec2(-1.0, -0.2)); k = 0.23;  a = 0.14; s = 2.9; g += d * k * a * cos(dot(d, p) * k + time * s);
-          return g;
-        }
-        vec3 sky(float y){ return mix(horizon, top, pow(smoothstep(0.0, 0.75, max(y, 0.0)), 0.8)); }
-        void main(){
-          vec2 p = wp.xz;
-          vec2 g = slope(p);
-          vec3 n = normalize(vec3(-g.x, 1.0, -g.y));
-          vec3 v = normalize(cameraPosition - wp);
-          vec3 r = reflect(-v, n);
-          float fres = mix(0.28, 0.92, pow(1.0 - max(dot(n, v), 0.0), 3.0));
-          vec3 col = mix(deep, sky(r.y), fres);
-          col += vec3(1.0) * pow(max(dot(r, sunDir), 0.0), 220.0) * 1.2;          // sun glint
-          // foam hugging each island + soft rings rolling outward
-          float d = min(min(length(p - c1.xy) - c1.z, length(p - c2.xy) - c2.z), length(p - c3.xy) - c3.z);
-          float edge = smoothstep(3.5, 0.0, d);
-          float rings = smoothstep(0.75, 1.0, sin(d * 0.55 - time * 1.6)) * smoothstep(22.0, 2.0, d);
-          col = mix(col, vec3(1.0), clamp(edge * 0.85 + rings * 0.45, 0.0, 1.0));
-          // melt into the sky at the horizon
-          float dist = length(wp.xz - cameraPosition.xz);
-          col = mix(col, horizon, smoothstep(700.0, 1900.0, dist));
-          gl_FragColor = vec4(col, 1.0);
-        }`
-    }));
-  ocean.rotation.x = -Math.PI/2;
-  ocean.position.y = WATER_Y;
-  ocean.frustumCulled = false;
-  ocean.onBeforeRender = (r, sc, cam) => { ocean.position.x = cam.position.x; ocean.position.z = cam.position.z; };   // endless sea
-  scene.add(ocean);
-
   // portal state (door swings open near the popcorn; stepping in transports to the theater)
   let popcornDoor = null, popcornGlow = null, portalTriggered = false;
   const popcornEntry = new THREE.Vector3(1e9, 0, 1e9);
   function enterPortal(){
-    sfx.whoosh();
     const flash = document.getElementById('flash');
     if (flash) flash.style.opacity = '1';
     setTimeout(() => { window.location.href = 'theater.html'; }, 800);
@@ -559,7 +491,6 @@
   const palettePortal = new THREE.Vector3(1e9, 0, 1e9);
   const downRay = new THREE.Raycaster(), _down = new THREE.Vector3(0,-1,0), _downOrigin = new THREE.Vector3();
   function enterGallery(){
-    sfx.whoosh();
     const flash = document.getElementById('flash');
     if (flash) flash.style.opacity = '1';
     setTimeout(() => { window.location.href = 'gallery.html'; }, 800);
@@ -700,6 +631,7 @@
 
     // place on the portal island (spot 1), scaled up into a little building; door faces the island's center
     const spot = isleSpot(SPOT.popcorn);
+    root.userData.neonRemap = { id: 'popcorn', 0xff1a3c: 0x2d6bff, 0xff2bd6: 0x2d6bff, 0xff8a00: 0xfff200 };   // neon: blue bucket, yellow popcorn
     root.scale.setScalar(12);
     root.position.copy(spot);
     root.rotation.y = yawToward(spot, ISLE_ENTRY);          // door faces the bridge
@@ -768,6 +700,7 @@
   makeLoader().load('rocket.glb', (gltf) => {
     const rocket = gltf.scene;
     rocket.traverse(o => { if (o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
+    rocket.userData.neonRemap = { id: 'rocket', 0xff1a3c: 0x39ff14, 0xff2bd6: 0x39ff14 };                        // neon: lime fins
 
     rocket.updateMatrixWorld(true);
     let rb = new THREE.Box3().setFromObject(rocket);
@@ -1004,8 +937,6 @@
   function runIntro(dt){
     if (introDone || introClock < 0) return;
     introClock += dt; const t = introClock;
-    if (introSfx === 0 && t >= 0.5){ introSfx = 1; sfx.twinkle(); }     // halo lights up
-    if (introSfx === 1 && t >= 1.3){ introSfx = 2; sfx.pop(); }         // dog pops in
     // 1) halo lights up + beam rises
     const lit = smooth(0.5, 1.3, t), fade = smooth(2.4, 3.6, t);
     centerHalo.core.material.opacity = 0.12 + 0.88*lit;
@@ -1086,6 +1017,7 @@
     dogMat.needsUpdate = true;
     hatSlot.clear();
     if (style.hat !== 'none') hatSlot.add(makeAccessory(style.hat));
+    if (theme !== 'classic') applyThemeTo(hatSlot, theme);
     try { localStorage.setItem(STYLE_KEY, JSON.stringify(style)); } catch (e) {}
     if (hop) wantJump = true;
     refreshPanel();
@@ -1140,7 +1072,6 @@
   // entering / leaving the station
   let styleMode = false, styleArmed = true, styleShift = 0, savedCam = null;
   function enterStyle(){
-    sfx.padChime();
     styleMode = true; styleArmed = false;
     savedCam = { pitch: camPitchT, dist: camDistT };
     camPitchT = 0.22; camDistT = 19; yawOffset = 0;
@@ -1160,390 +1091,223 @@
     if (styleMode && ['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Escape'].includes(e.code)) exitStyle();
   });
 
-  // ================= boombox: step on the pad to open Lorelai's Spotify playlist =================
-  const SPOTIFY_PLAYLIST = 'spotify:playlist:0gOT9xIjBZ31OmriiN3WLU';   // Lorelai's playlist
-  const boombox = (function buildBoombox(){
-    const g = new THREE.Group();
-    const phys = (color, o = {}) => new THREE.MeshPhysicalMaterial(Object.assign({ color, roughness: 0.3, clearcoat: 0.8, clearcoatRoughness: 0.15 }, o));
-    const add = (geo, mat, x, y, z, parent = g) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; parent.add(m); return m; };
-    const body = phys(0xc7a6ff), silver = phys(0xdfe3ea, { metalness: 0.85, roughness: 0.25 }), dark = phys(0x2b2230, { roughness: 0.5 });
-    const RAIN = [0xff6fae, 0xf6934a, 0xf6d04a, 0xa9e05a, 0x56c5f1, 0x6a86ef, 0xb58cff];
-    add(new RoundedBoxGeometry(20, 11, 6, 4, 1.3), body, 0, 7, 0);
-    for (const x of [-8, 8]) for (const z of [-2, 2]) add(new THREE.CylinderGeometry(0.6, 0.7, 1.5, 12), dark, x, 0.75, z);
-    // speakers
-    const speakers = [];
-    for (const x of [-6, 6]){
-      const sp = new THREE.Group(); sp.position.set(x, 6.8, 3.02); g.add(sp);
-      add(new THREE.TorusGeometry(3.3, 0.35, 12, 48), silver, 0, 0, 0.05, sp);
-      add(new THREE.CircleGeometry(3.15, 48), dark, 0, 0, 0, sp);
-      add(new THREE.CircleGeometry(1.7, 40), phys(0x4a3d52), 0, 0, 0.05, sp);
-      add(new THREE.SphereGeometry(0.8, 24, 12, 0, Math.PI*2, 0, Math.PI/2), phys(0xff6fae), 0, 0, 0.08, sp).rotation.x = Math.PI/2;
-      speakers.push(sp);
-    }
-    // cassette window + spinning reels
-    add(new THREE.PlaneGeometry(5.6, 3), phys(0x3a2d3f, { roughness: 0.15 }), 0, 8.4, 3.03);
-    const reels = [-1.4, 1.4].map(x => {
-      const r = new THREE.Group(); r.position.set(x, 8.4, 3.06); g.add(r);
-      add(new THREE.CircleGeometry(0.85, 24), phys(0xffffff), 0, 0, 0, r);
-      for (let i = 0; i < 3; i++){ const s = add(new THREE.PlaneGeometry(0.18, 1.3), dark, 0, 0, 0.01, r); s.rotation.z = i * Math.PI/3; }
-      return r;
-    });
-    // equalizer bars
-    const bars = RAIN.map((c, i) => {
-      const b = add(new THREE.BoxGeometry(0.45, 1, 0.2), new THREE.MeshBasicMaterial({ color: c, toneMapped: false }), -1.8 + i*0.6, 5.3, 3.05);
-      b.castShadow = false; return b;
-    });
-    // label
-    { const c = document.createElement('canvas'); c.width = 512; c.height = 110; const x = c.getContext('2d');
-      x.fillStyle = '#fff6f1'; x.fillRect(0, 0, 512, 110); x.fillStyle = '#7a2a55'; x.font = 'italic 700 64px Georgia, serif';
-      x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('lorelai fm', 256, 58);
-      const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
-      add(new THREE.PlaneGeometry(5.6, 1.2), new THREE.MeshBasicMaterial({ map: t }), 0, 10.9, 3.04).castShadow = false; }
-    // buttons, handle, antenna
-    RAIN.slice(0, 5).forEach((c, i) => add(new THREE.BoxGeometry(1.4, 0.6, 1.1), phys(c), -4 + i*2, 12.7, 1.4));
-    add(new THREE.TorusGeometry(7, 0.45, 12, 40, Math.PI), silver, 0, 12.4, -1.2);
-    const ant = add(new THREE.CylinderGeometry(0.12, 0.18, 9, 8), silver, 9.6, 16.3, -1.8); ant.rotation.z = -0.45;
-    add(new THREE.SphereGeometry(0.35, 12, 8), phys(0xff6fae), 11.6, 20.4, -1.8);
-    // glowing pad in front
-    const ring = new THREE.Mesh(new THREE.RingGeometry(4.4, 5.5, 64), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true,
-      opacity: 0.7, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false }));
-    ring.rotation.x = -Math.PI/2; ring.position.set(0, 0.3, 11); g.add(ring);
-    const glow = new THREE.Mesh(new THREE.RingGeometry(5.5, 8.8, 64), new THREE.MeshBasicMaterial({ color: 0xd9ccff, transparent: true,
-      opacity: 0.3, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, depthWrite: false }));
-    glow.rotation.x = -Math.PI/2; glow.position.set(0, 0.28, 11); g.add(glow);
-    // floating music notes
-    const noteTex = ['♪', '♫', '♬'].map((ch, i) => {
-      const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d');
-      x.font = 'bold 110px Georgia, serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
-      x.fillStyle = ['#ff6fae', '#6a86ef', '#a9e05a'][i]; x.fillText(ch, 64, 70);
-      const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
-    });
-    const notes = [];
-    for (let i = 0; i < 10; i++){
-      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: noteTex[i % 3], transparent: true, opacity: 0, depthWrite: false }));
-      s.scale.setScalar(2.4); g.add(s); notes.push({ s, t: Math.random(), x: (Math.random() - 0.5) * 16 });
-    }
-    // place it on rim halo #3 (front-right of the spawn), facing the center
-    const a = (3/5)*Math.PI*2 - Math.PI/2;
-    g.position.set(Math.cos(a)*(PATH_R - 4), 0, Math.sin(a)*(PATH_R - 4));
-    g.rotation.y = yawToward(g.position, new THREE.Vector3(0, 0, 0));
-    scene.add(g); g.updateMatrixWorld(true);
-    const pad = g.localToWorld(new THREE.Vector3(0, 0, 11));
-    let beatT = 0, jamAmt = 0;
-    function update(dt, t, playing){
-      const p = 0.5 + 0.5*Math.sin(t*2.2);
-      ring.material.opacity = 0.45 + 0.4*p; glow.material.opacity = 0.15 + 0.25*p;
-      jamAmt += ((playing ? 1 : 0) - jamAmt) * Math.min(1, dt*4);
-      beatT += dt * (120/60) * Math.PI * 2;                          // ~120 bpm pulse
-      const beat = Math.pow(0.5 + 0.5*Math.sin(beatT), 3) * jamAmt;
-      for (const sp of speakers){ sp.scale.set(1 + beat*0.12, 1 + beat*0.12, 1 + beat*0.6); }
-      for (const r of reels) r.rotation.z -= dt * 3 * jamAmt;
-      bars.forEach((b, i) => { const h = 0.3 + jamAmt * (0.6 + 0.9*Math.abs(Math.sin(t*(3 + i*0.7) + i))); b.scale.y = h; b.position.y = 4.8 + h/2; });
-      g.position.y = beat * 0.35;
-      for (const n of notes){
-        n.t += dt * 0.35;
-        if (n.t > 1){ n.t -= 1; n.x = (Math.random() - 0.5) * 16; }
-        n.s.position.set(n.x + Math.sin(n.t*6 + n.x)*1.2, 14 + n.t*14, 1);
-        n.s.material.opacity = jamAmt * Math.sin(Math.PI * n.t);
+  // ================= themes: classic (starter) + neon =================
+  // Every mesh keeps its classic material in userData.classicMat; a theme swaps in its own version.
+  let theme = 'classic', themeSwitching = false;
+  const CLASSIC_SKY = { top: SKY_TOP.getHex(), horizon: SKY_HORIZON.getHex(), below: SKY_BELOW.getHex(), fog: scene.fog.color.getHex(), bg: scene.background.getHex() };
+  const NEON_SKY = { top: 0x0b0226, horizon: 0x06010f, below: 0x000000, fog: 0x05010c, bg: 0x000000 };
+
+  // bloom for the neon look (only used while neon is on)
+  const composer = new EffectComposer(renderer);
+  composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(innerWidth, innerHeight);
+  composer.addPass(new RenderPass(scene, camera));
+  const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.4, 0.4, 0.8);
+  composer.addPass(bloom);
+  composer.addPass(new OutputPass());
+
+  const _hsl = {};
+  // map any color to the nearest bright "neon" color
+  // the rainbow paths get a real neon rainbow, lane for lane (periwinkle→purple … red→red)
+  const NEON_RAINBOW = { 0x6a86ef: 0xb026ff, 0x56c5f1: 0x2d6bff, 0xa9e05a: 0x39ff14,
+                         0xf6b74a: 0xfff200, 0xf0794c: 0xff8a00, 0xef5566: 0xff1a3c };
+  function neonInto(src, out, remap){
+    const rb = NEON_RAINBOW[src.getHex()];
+    if (rb !== undefined) return out.set(rb);
+    neonBase(src, out);
+    if (remap){ const r = remap[out.getHex()]; if (r !== undefined) out.set(r); }
+    return out;
+  }
+  function neonBase(src, out){
+    src.getHSL(_hsl);
+    if (_hsl.l < 0.12) return out.set(0x14002a);                                  // near-black stays dark (deep violet)
+    if (_hsl.s >= 0.15 && _hsl.s < 0.45 && _hsl.l < 0.4) return out.set(0xb026ff); // browns / muddy darks → neon purple
+    if (_hsl.s < 0.15) return out.set(_hsl.l > 0.6 ? 0xffffff : _hsl.l > 0.3 ? 0xd9d9ff : 0x3a2a5a);  // white / silver / dark grey
+    const h = _hsl.h * 360;
+    if (h < 12 || h >= 348) return out.set(0xff1a3c);    // red → neon red
+    if (h < 20 || h >= 290) return out.set(0xff2bd6);    // magenta, pink → hot pink
+    if (h < 40)  return out.set(0xff8a00);               // electric orange
+    if (h < 70)  return out.set(0xfff200);               // electric yellow
+    if (h < 165) return out.set(0x39ff14);               // lime
+    if (h < 200) return out.set(0x00f0ff);               // cyan
+    if (h < 250) return out.set(0x2d6bff);               // electric blue
+    return out.set(0xb026ff);                            // neon purple
+  }
+  const neonOf = c => neonInto(c, new THREE.Color());
+  // recolor a texture (cart stripes, signs) pixel by pixel through the same neon mapping
+  function neonTex(tex, remap){
+    const img = tex.image; if (!img || !img.width) return tex;
+    const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+    const x = c.getContext('2d'); x.drawImage(img, 0, 0);
+    const d = x.getImageData(0, 0, c.width, c.height), px = d.data, memo = new Map();
+    const col = new THREE.Color(), out = new THREE.Color(), rgb = {};
+    for (let i = 0; i < px.length; i += 4){
+      const key = (px[i] << 16) | (px[i+1] << 8) | px[i+2];
+      let v = memo.get(key);
+      if (v === undefined){
+        col.setRGB(px[i]/255, px[i+1]/255, px[i+2]/255, THREE.SRGBColorSpace);
+        neonInto(col, out, remap).getRGB(rgb, THREE.SRGBColorSpace);
+        v = [rgb.r*255, rgb.g*255, rgb.b*255]; memo.set(key, v);
       }
+      px[i] = v[0]; px[i+1] = v[1]; px[i+2] = v[2];
     }
-    return { group: g, pad, update };
-  })();
-
-  // ---- the player panel (Spotify iFrame API) ----
-  const musicPanel = document.getElementById('musicPanel'), musicBody = document.getElementById('mBody');
-  let spotifyCtl = null, spotifyApi = null, musicOpen = false, musicPlaying = false, boomArmed = true;
-  function loadSpotifyApi(){
-    if (spotifyApi) return spotifyApi;
-    spotifyApi = new Promise(res => {
-      window.onSpotifyIframeApiReady = api => res(api);
-      const s = document.createElement('script'); s.src = 'https://open.spotify.com/embed/iframe-api/v1'; s.async = true;
-      document.body.appendChild(s);
-    });
-    return spotifyApi;
+    x.putImageData(d, 0, 0);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = tex.colorSpace; t.wrapS = tex.wrapS; t.wrapT = tex.wrapT;
+    return t;
   }
-  function setMusicMin(on){
-    musicPanel.classList.toggle('min', on);
-    const f = musicBody.querySelector('iframe'); if (f) f.style.height = (on ? 80 : 352) + 'px';
-  }
-  function openMusic(){
-    musicOpen = true; musicPanel.classList.add('open'); musicPanel.setAttribute('aria-hidden', 'false'); setMusicMin(false);
-    if (spotifyCtl) return;
-    loadSpotifyApi().then(api => {
-      musicBody.innerHTML = ''; const el = document.createElement('div'); musicBody.appendChild(el);
-      api.createController(el, { uri: SPOTIFY_PLAYLIST, width: '100%', height: 352 }, ctl => {
-        spotifyCtl = ctl;
-        ctl.addListener('playback_update', e => { musicPlaying = !!e.data && !e.data.isPaused; });
-        ctl.addListener('ready', () => { try { ctl.play(); } catch (e) {} });   // may need a click on ▶ (browser autoplay rules)
-      });
-    });
-  }
-  function closeMusic(){
-    musicOpen = false; musicPlaying = false;
-    musicPanel.classList.remove('open', 'min'); musicPanel.setAttribute('aria-hidden', 'true');
-    if (spotifyCtl){ try { spotifyCtl.destroy(); } catch (e) {} spotifyCtl = null; }
-    musicBody.innerHTML = '';
-  }
-  document.getElementById('mMin').onclick = () => setMusicMin(!musicPanel.classList.contains('min'));
-  document.getElementById('mClose').onclick = () => closeMusic();
-
-  // ================= meadow: thick swaying grass on the park =================
-  function meadowSpot(x, z){                                     // anywhere on the park, except where the bridge lands
-    if (Math.hypot(x - PARK_C.x, z - PARK_C.z) > PARK_R - 1.5) return false;
-    const along = x*PARK_DIR.x + z*PARK_DIR.z, side = Math.abs(-x*PARK_DIR.z + z*PARK_DIR.x);
-    if (side < PATH_W/2 + 2 && along < DISH_R + PARK_GAP + 16) return false;
-    return true;
-  }
-  const grassUniforms = Object.assign(THREE.UniformsUtils.clone(THREE.UniformsLib.fog), {
-    time: { value: 0 }, dogPos: { value: new THREE.Vector3(1e4, 0, 1e4) },
-    deepC:  { value: new THREE.Color(0x2e7d32) },   // shady patches
-    midC:   { value: new THREE.Color(0x5cae48) },
-    lightC: { value: new THREE.Color(0xa6dc5c) },   // sunny patches
-    warmC:  { value: new THREE.Color(0xcfd65a) },   // a few golden-ish patches
-  });
-  (function buildGrass(){
-    const g = new THREE.BufferGeometry();                          // one tapered, slightly curved blade (0..1 tall)
-    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
-      -0.5, 0, 0,   0.5, 0, 0,   -0.33, 0.5, 0.06,   0.33, 0.5, 0.06,   0, 1, 0.2 ]), 3));
-    g.setIndex([0, 1, 2, 1, 3, 2, 2, 3, 4]);
-    const mat = new THREE.ShaderMaterial({
-      uniforms: grassUniforms, side: THREE.DoubleSide, fog: true,
-      vertexShader: `
-        #include <common>
-        #include <fog_pars_vertex>
-        uniform float time; uniform vec3 dogPos;
-        varying float vH; varying vec3 vCol; varying vec2 vRoot; varying float vW;
+  // the dog keeps the glowing-outline look: dark body + bright fresnel rim
+  function fresnelMat(src){
+    return new THREE.ShaderMaterial({
+      uniforms: { color: { value: neonOf(src.color || new THREE.Color(1,1,1)) }, map: { value: src.map || null },
+                  useMap: { value: src.map ? 1 : 0 }, opacity: { value: src.opacity ?? 1 } },
+      side: src.side, transparent: !!src.transparent,
+      vertexShader: `varying vec3 vN; varying vec3 vV; varying vec2 vUv;
+        void main(){ vUv = uv; vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }`,
+      fragmentShader: `uniform vec3 color; uniform sampler2D map; uniform float useMap; uniform float opacity;
+        varying vec3 vN; varying vec3 vV; varying vec2 vUv;
         void main(){
-          float h = position.y;
-          vec4 wp   = modelMatrix * instanceMatrix * vec4(position, 1.0);
-          vec4 root = modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
-          float bend = h * h;
-          float w = sin(time*1.4 + root.x*0.06 + root.z*0.045) * 0.7 + sin(time*2.6 + root.x*0.19 - root.z*0.11) * 0.25;
-          wp.x += w * bend * 0.9; wp.z += w * bend * 0.45;
-          vec2 dd = root.xz - dogPos.xz; float push = smoothstep(6.0, 0.0, length(dd));
-          wp.xz += normalize(dd + 1e-4) * push * bend * 2.4; wp.y -= push * bend * 0.9;   // part around the dog
-          vH = h; vRoot = root.xz; vW = w;
-          #ifdef USE_INSTANCING_COLOR
-            vCol = instanceColor;
-          #else
-            vCol = vec3(1.0);
-          #endif
-          vec4 mvPosition = viewMatrix * wp;
-          gl_Position = projectionMatrix * mvPosition;
-          #include <fog_vertex>
-        }`,
-      fragmentShader: `
-        #include <common>
-        #include <fog_pars_fragment>
-        uniform vec3 deepC, midC, lightC, warmC;
-        varying float vH; varying vec3 vCol; varying vec2 vRoot; varying float vW;
-        float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-        float vnoise(vec2 p){
-          vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f);
-          return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
-        }
-        void main(){
-          // big soft patches of darker / lighter / golden grass across the meadow
-          float n = vnoise(vRoot / 28.0) * 0.65 + vnoise(vRoot / 9.0) * 0.35;
-          vec3 patchCol = mix(mix(deepC, midC, smoothstep(0.2, 0.55, n)), lightC, smoothstep(0.55, 0.85, n));
-          patchCol = mix(patchCol, warmC, smoothstep(0.62, 0.9, vnoise(vRoot / 45.0 + 17.0)) * 0.6);
-          vec3 col = patchCol * vCol * mix(0.42, 1.12, vH);          // darker down at the roots
-          col *= 1.0 + 0.18 * max(vW, 0.0) * vH;                     // gusts catch the light
-          gl_FragColor = vec4(col, 1.0);
-          #include <tonemapping_fragment>
-          #include <colorspace_fragment>
-          #include <fog_fragment>
+          vec3 n = normalize(vN) * (gl_FrontFacing ? 1.0 : -1.0);
+          float f = 1.0 - clamp(dot(n, normalize(vV)), 0.0, 1.0);
+          vec3 c = color;
+          if (useMap > 0.5){ vec3 t = texture2D(map, vUv).rgb; c = t / max(max(t.r, t.g), max(t.b, 0.05)); }
+          gl_FragColor = vec4(c * (0.07 + 0.3*f + 2.6*pow(f, 3.0)), opacity);
         }`
     });
-    const N = 170000, grass = new THREE.InstancedMesh(g, mat, N);
-    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0), c = new THREE.Color();
-    let n = 0, tries = 0;
-    while (n < N && tries < N * 4){
-      tries++;
-      const r = Math.sqrt(Math.random()) * PARK_R, a = Math.random() * Math.PI * 2, x = PARK_C.x + Math.cos(a)*r, z = PARK_C.z + Math.sin(a)*r;
-      if (!meadowSpot(x, z)) continue;
-      p.set(x, 0, z); q.setFromAxisAngle(up, Math.random() * Math.PI * 2);
-      const h = 1.3 + Math.random() * 1.5; sc.set(0.32 + Math.random()*0.22, h, 1);
-      grass.setMatrixAt(n, m.compose(p, q, sc));
-      const k = 0.78 + Math.random() * 0.4;                      // per-blade brightness + a little hue jitter
-      grass.setColorAt(n, c.setRGB(k * (0.93 + Math.random()*0.14), k, k * (0.88 + Math.random()*0.18)));
-      n++;
-    }
-    grass.count = n; grass.frustumCulled = false;
-    scene.add(grass);
-  })();
-
-  // ================= sound: everything synthesized with Web Audio (no files, loads instantly) =================
-  // Browsers only allow sound after the visitor clicks or presses a key, so it all starts on the first input.
-  const sfx = (() => {
-    let ctx = null, master = null, amb = null, white = null, muted = false;
-    try { muted = localStorage.getItem('lorelai-muted') === '1'; } catch (e) {}
-    const btn = document.getElementById('muteBtn');
-    const paint = () => { btn.textContent = muted ? '🔇' : '🔊'; btn.title = muted ? 'sound on' : 'sound off'; };
-    paint();
-    function noiseBuffer(sec, brown){
-      const b = ctx.createBuffer(1, Math.floor(ctx.sampleRate * sec), ctx.sampleRate), d = b.getChannelData(0);
-      let last = 0;
-      for (let i = 0; i < d.length; i++){ const w = Math.random()*2 - 1; if (brown){ last = (last + 0.02*w) / 1.02; d[i] = last * 3.5; } else d[i] = w; }
-      return b;
-    }
-    function start(){
-      if (ctx){ if (ctx.state === 'suspended') ctx.resume(); return; }
-      const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
-      ctx = new AC();
-      master = ctx.createGain(); master.gain.value = muted ? 0 : 0.9; master.connect(ctx.destination);
-      white = noiseBuffer(2, false);
-      startAmbience();
-    }
-    const now = () => ctx.currentTime;
-    function env(g, t0, a, peak, d){
-      g.gain.setValueAtTime(0.0001, t0);
-      g.gain.exponentialRampToValueAtTime(peak, t0 + a);
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + a + d);
-    }
-    function bell(freq, t0, vol, dest, dur){
-      [1, 2.76, 5.4].forEach((m, i) => {
-        const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = freq * m;
-        const g = ctx.createGain(); env(g, t0, 0.005, vol / (i*2 + 1), dur / (i + 1));
-        o.connect(g).connect(dest); o.start(t0); o.stop(t0 + dur + 0.1);
-      });
-    }
-    const PENTA = [523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1174.66, 1318.5];
-    const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
-    // ---- ambience: soft generative music — pad chords, a music-box melody, gentle bass, lots of air ----
-    function makeReverb(sec){
-      const len = Math.floor(ctx.sampleRate * sec), b = ctx.createBuffer(2, len, ctx.sampleRate);
-      for (let c = 0; c < 2; c++){ const d = b.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (Math.random()*2 - 1) * Math.pow(1 - i/len, 2.6); }
-      const cv = ctx.createConvolver(); cv.buffer = b; return cv;
-    }
-    let bus, wet;
-    const BPM = 66, EIGHTH = 60 / BPM / 2, CHORD_LEN = 16;           // 2 bars of 4/4 per chord
-    const CHORDS = [ [53, 57, 60, 64], [48, 55, 59, 64], [45, 52, 55, 60], [43, 50, 55, 59] ];   // Fmaj7 · Cmaj7 · Am7 · G(maj7)
-    const ROOTS  = [41, 36, 45, 43];
-    const MELODY = [72, 74, 76, 79, 81, 84, 86, 88];                   // C major pentatonic, up high
-    const MELODY_ON = false;                                           // music-box melody off — just the chords
-    let nextT = 0, step = 0, mel = 3;
-    function startAmbience(){
-      amb = ctx.createGain(); amb.gain.value = 0.0001; amb.connect(master);
-      amb.gain.setTargetAtTime(1, now(), 2.5);                         // fade in
-      bus = ctx.createGain(); bus.gain.value = 0.55; bus.connect(amb);
-      const rev = makeReverb(3.6); wet = ctx.createGain(); wet.gain.value = 0.55;
-      bus.connect(rev); rev.connect(wet); wet.connect(amb);
-      nextT = now() + 0.3;
-      setInterval(tick, 100);
-    }
-    function tick(){
-      if (!ctx || ctx.state !== 'running') return;
-      while (nextT < now() + 0.35){ schedule(step, nextT); nextT += EIGHTH; step++; }
-    }
-    function pad(notes, t, dur){
-      notes.forEach(m => [-4, 4].forEach(det => {
-        const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = mtof(m); o.detune.value = det;
-        const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900;
-        const g = ctx.createGain();
-        g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.016, t + 2.2);
-        g.gain.setValueAtTime(0.016, t + dur - 0.2); g.gain.linearRampToValueAtTime(0.0001, t + dur + 2.2);
-        o.connect(lp).connect(g).connect(bus); o.start(t); o.stop(t + dur + 2.4);
-      }));
-    }
-    function bass(m, t, dur){
-      const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = mtof(m);
-      const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.05, t + 0.6);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      o.connect(g).connect(bus); o.start(t); o.stop(t + dur + 0.1);
-    }
-    function musicBox(f, t, v){
-      [[1, 1], [3.0, 0.18], [5.02, 0.06]].forEach(([mult, amp], i) => {
-        const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f * mult;
-        const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t);
-        g.gain.exponentialRampToValueAtTime(0.06 * v * amp, t + 0.006);
-        g.gain.exponentialRampToValueAtTime(0.0001, t + (i ? 0.5 : 1.9));
-        o.connect(g).connect(bus); o.start(t); o.stop(t + 2);
-      });
-    }
-    function schedule(n, t){
-      const inChord = n % CHORD_LEN, ci = Math.floor(n / CHORD_LEN) % CHORDS.length;
-      if (inChord === 0){ pad(CHORDS[ci], t, CHORD_LEN * EIGHTH); bass(ROOTS[ci], t, CHORD_LEN * EIGHTH * 0.9); }
-      // sparse melody: likelier on the beat, a quiet pass every fourth phrase
-      const phrase = Math.floor(n / (CHORD_LEN * 2)) % 4;
-      let p = inChord % 4 === 0 ? 0.42 : inChord % 2 === 0 ? 0.2 : 0.08;
-      if (phrase === 3) p *= 0.35;
-      if (MELODY_ON && Math.random() < p){
-        mel = Math.max(0, Math.min(MELODY.length - 1, mel + [-2, -1, -1, 0, 1, 1, 2][Math.floor(Math.random()*7)]));
-        musicBox(mtof(MELODY[mel]), t + (Math.random()*0.02), 0.6 + Math.random()*0.4);
-      }
-    }
-    // ---- one-shots ----
-    function squeak(run){                                          // rubbery balloon step
-      if (!ctx) return; const t = now();
-      const o = ctx.createOscillator(); o.type = 'triangle';
-      const f = (run ? 1150 : 850) * (0.85 + Math.random()*0.3);
-      o.frequency.setValueAtTime(f*0.8, t); o.frequency.linearRampToValueAtTime(f*1.2, t + 0.035); o.frequency.linearRampToValueAtTime(f*0.95, t + 0.08);
-      const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f*1.5; bp.Q.value = 3;
-      const g = ctx.createGain(); env(g, t, 0.01, 0.05, 0.08);
-      o.connect(bp).connect(g).connect(master); o.start(t); o.stop(t + 0.12);
-    }
-    function boing(){                                              // jump
-      if (!ctx) return; const t = now();
-      const o = ctx.createOscillator(); o.type = 'sine';
-      o.frequency.setValueAtTime(180, t); o.frequency.exponentialRampToValueAtTime(520, t + 0.12);
-      const vib = ctx.createOscillator(); vib.frequency.value = 22;
-      const va = ctx.createGain(); va.gain.setValueAtTime(60, t); va.gain.exponentialRampToValueAtTime(1, t + 0.45);
-      vib.connect(va).connect(o.frequency);
-      const g = ctx.createGain(); env(g, t, 0.01, 0.16, 0.45);
-      o.connect(g).connect(master); o.start(t); vib.start(t); o.stop(t + 0.5); vib.stop(t + 0.5);
-    }
-    function thump(){                                              // land
-      if (!ctx) return; const t = now();
-      const o = ctx.createOscillator(); o.type = 'sine';
-      o.frequency.setValueAtTime(110, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.14);
-      const g = ctx.createGain(); env(g, t, 0.005, 0.22, 0.16);
-      o.connect(g).connect(master); o.start(t); o.stop(t + 0.2);
-      squeak(false);
-    }
-    function padChime(){                                           // stepping onto a station pad
-      if (!ctx) return; const t = now();
-      [1046.5, 1318.5, 1568, 2093].forEach((f, i) => bell(f, t + i*0.07, 0.07, master, 1.2));
-    }
-    function whoosh(){                                             // through a portal
-      if (!ctx) return; const t = now();
-      const s = ctx.createBufferSource(); s.buffer = white;
-      const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.2;
-      bp.frequency.setValueAtTime(300, t); bp.frequency.exponentialRampToValueAtTime(3500, t + 0.7);
-      const g = ctx.createGain(); env(g, t, 0.25, 0.35, 0.55);
-      s.connect(bp).connect(g).connect(master); s.start(t); s.stop(t + 0.9);
-      const o = ctx.createOscillator(); o.type = 'sine';
-      o.frequency.setValueAtTime(400, t); o.frequency.exponentialRampToValueAtTime(1600, t + 0.8);
-      const og = ctx.createGain(); env(og, t, 0.3, 0.05, 0.5);
-      o.connect(og).connect(master); o.start(t); o.stop(t + 0.9);
-    }
-    function twinkle(){                                            // intro: the halo lights up
-      if (!ctx) return; const t = now();
-      PENTA.forEach((f, i) => bell(f, t + i*0.06, 0.05, master, 1.4));
-    }
-    function pop(){                                                // intro: the dog pops in
-      if (!ctx) return; const t = now();
-      const o = ctx.createOscillator(); o.type = 'sine';
-      o.frequency.setValueAtTime(900, t); o.frequency.exponentialRampToValueAtTime(220, t + 0.06);
-      const g = ctx.createGain(); env(g, t, 0.003, 0.25, 0.08);
-      o.connect(g).connect(master); o.start(t); o.stop(t + 0.12);
-      const s = ctx.createBufferSource(); s.buffer = white;
-      const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2000;
-      const sg = ctx.createGain(); env(sg, t, 0.002, 0.12, 0.04);
-      s.connect(hp).connect(sg).connect(master); s.start(t); s.stop(t + 0.06);
-    }
-    function setDuck(on){ if (amb) amb.gain.setTargetAtTime(on ? 0.04 : 1, now(), 0.8); }  // music bows out under the boombox
-    btn.addEventListener('pointerdown', e => e.stopPropagation());
-    btn.addEventListener('click', e => {
-      e.stopPropagation(); muted = !muted; paint();
-      try { localStorage.setItem('lorelai-muted', muted ? '1' : '0'); } catch (err) {}
-      start(); if (master) master.gain.setTargetAtTime(muted ? 0 : 0.9, now(), 0.05);
-      btn.blur();
+  }
+  // dish floors: black with a glowing grid and a bright rim
+  function gridMat(cx, cz, R){
+    return new THREE.ShaderMaterial({
+      uniforms: { c: { value: new THREE.Vector2(cx, cz) }, R: { value: R },
+                  line: { value: new THREE.Color(0xff2bd6) }, edge: { value: new THREE.Color(0x00e5ff) } },
+      side: THREE.DoubleSide,
+      vertexShader: `varying vec3 wp; void main(){ vec4 w = modelMatrix * vec4(position, 1.0); wp = w.xyz;
+        gl_Position = projectionMatrix * viewMatrix * w; }`,
+      fragmentShader: `uniform vec2 c; uniform float R; uniform vec3 line, edge; varying vec3 wp;
+        void main(){
+          vec2 q = (wp.xz - c) / 12.0;
+          vec2 g = abs(fract(q - 0.5) - 0.5) / fwidth(q);
+          float l = 1.0 - min(min(g.x, g.y), 1.0);
+          float r = length(wp.xz - c);
+          float e = smoothstep(R - 6.0, R - 0.5, r);
+          vec3 col = vec3(0.012, 0.0, 0.03) + line * l * 0.32 + edge * e * 1.2;
+          gl_FragColor = vec4(col, 1.0);
+        }`
     });
-    addEventListener('keydown', start); addEventListener('pointerdown', start);
-    return { squeak, boing, thump, padChime, whoosh, twinkle, pop, setDuck };
+  }
+  const neonTracked = [];                 // neon materials that follow a live classic material (the dog)
+  function remapOf(o){ for (let p = o; p; p = p.parent) if (p.userData.neonRemap) return p.userData.neonRemap; return null; }
+  function neonMaterial(o, m){
+    const remap = remapOf(o);
+    if (o.name === 'floor') return o === isleTop ? gridMat(ISLE_C.x, ISLE_C.z, ISLE_R) : gridMat(0, 0, DISH_R);
+    if (o.name === 'rim')   return new THREE.MeshBasicMaterial({ color: 0x2d6bff, side: THREE.DoubleSide, toneMapped: false });
+    if (o.name === 'under') return new THREE.MeshBasicMaterial({ color: 0x000000 });
+    if (m.isShadowMaterial) return m;                    // keep the soft shadows
+    if (m === dogMat){ const f = fresnelMat(m); neonTracked.push([f, m]); return f; }   // glowing neon dog
+    const n = m.clone();
+    if (m.map) n.map = neonTex(m.map, remap);
+    if (m.isMeshBasicMaterial || m.isLineBasicMaterial || m.isPointsMaterial){
+      if (!m.map && !m.vertexColors) neonInto(m.color, n.color, remap);   // (vertex colors are swapped on the geometry)
+      return n;
+    }
+    // lit materials: solid neon color + a little self-glow so it pops on the dark
+    neonInto(m.color, n.color, remap);
+    if (m.emissive && m.emissiveIntensity > 1 && m.emissive.getHex() !== 0){   // things that already glow (palette paint)
+      n.emissive = neonOf(m.emissive); n.emissiveIntensity = 2.2;
+    } else if (n.emissive){
+      if (n.map){ n.emissiveMap = n.map; n.emissive.setScalar(0.3); }
+      else n.emissive.copy(n.color).multiplyScalar(0.3);
+      n.emissiveIntensity = 1;
+    }
+    return n;
+  }
+  const neonCache = new Map();           // one neon material per classic material (the popcorn has ~1000 kernels sharing one)
+  function neonFor(o, m){
+    if (o.name === 'floor' || o.name === 'rim' || o.name === 'under') return neonMaterial(o, m);
+    const key = m.uuid + '|' + (remapOf(o) ? remapOf(o).id : '');
+    if (!neonCache.has(key)) neonCache.set(key, neonMaterial(o, m));
+    return neonCache.get(key);
+  }
+  function applyThemeTo(root, id){
+    root.traverse(o => {
+      if (!(o.isMesh || o.isPoints || o.isLine) || o.name === 'sky') return;
+      if (o.userData.classicMat === undefined) o.userData.classicMat = o.material;
+      const vc = o.geometry && o.geometry.attributes.color;
+      if (vc && !Array.isArray(o.userData.classicMat) && o.userData.classicMat.vertexColors){
+        if (!o.userData.classicColor){
+          o.userData.classicColor = vc;
+          const nv = vc.clone(), c = new THREE.Color();
+          for (let i = 0; i < nv.count; i++){ c.fromBufferAttribute(vc, i); neonInto(c, c); nv.setXYZ(i, c.r, c.g, c.b); }
+          o.userData.neonColor = nv;
+        }
+        o.geometry.setAttribute('color', id === 'classic' ? o.userData.classicColor : o.userData.neonColor);
+      }
+      if (id === 'classic'){ o.material = o.userData.classicMat; return; }
+      const orig = o.userData.classicMat;
+      if (!o.userData.neonMat) o.userData.neonMat = Array.isArray(orig) ? orig.map(m => neonFor(o, m)) : neonFor(o, orig);
+      o.material = o.userData.neonMat;
+    });
+  }
+  function applyTheme(id){
+    theme = id;
+    applyThemeTo(scene, id);
+    const k = id === 'neon' ? NEON_SKY : CLASSIC_SKY;
+    SKY_TOP.set(k.top); SKY_HORIZON.set(k.horizon); SKY_BELOW.set(k.below);
+    scene.fog.color.set(k.fog); scene.background.set(k.bg);
+  }
+  function switchTheme(id){
+    if (themeSwitching || id === theme) return;
+    themeSwitching = true;
+    const f = document.getElementById('flash');
+    f.style.transition = 'opacity .22s ease'; f.style.background = id === 'neon' ? '#000' : '#fff'; f.style.opacity = '1';
+    setTimeout(() => {
+      applyTheme(id);
+      f.style.opacity = '0';
+      setTimeout(() => { f.style.transition = ''; f.style.background = ''; themeSwitching = false; }, 320);
+    }, 240);
+  }
+
+  // ---------- theme station: three arcade buttons on a platform, to your left at spawn ----------
+  const themeButtons = [];
+  (function buildThemeStation(){
+    const g = new THREE.Group();
+    const left = new THREE.Vector3(BRIDGE_DIR.z, 0, -BRIDGE_DIR.x);
+    g.position.copy(left).multiplyScalar(62);
+    g.rotation.y = yawToward(g.position, new THREE.Vector3(0, 0, 0));
+    const phys = (color, o = {}) => new THREE.MeshPhysicalMaterial(Object.assign({ color, roughness: 0.3, clearcoat: 0.8, clearcoatRoughness: 0.15 }, o));
+    const add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; g.add(m); return m; };
+    function label(text, w, h, font){
+      const c = document.createElement('canvas'); c.width = 512; c.height = Math.round(512*h/w);
+      const x = c.getContext('2d'); x.fillStyle = '#fff6f1'; x.fillRect(0, 0, c.width, c.height);
+      x.fillStyle = '#7a2a55'; x.font = font; x.textAlign = 'center'; x.textBaseline = 'middle';
+      x.fillText(text, c.width/2, c.height/2);
+      const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+      return new THREE.MeshBasicMaterial({ map: t });
+    }
+    const white = phys(0xfff6f1), dark = phys(0x2b2230, { metalness: 0.3, roughness: 0.4 });
+    add(new THREE.BoxGeometry(38, 0.8, 15), white, 0, 0.4, 0);                              // platform
+    add(new THREE.BoxGeometry(38.6, 0.3, 15.6), phys(0xf3c14b, { metalness: 0.6 }), 0, 0.15, 0);
+    for (const x of [-12, 12]) add(new THREE.CylinderGeometry(0.35, 0.35, 8, 12), white, x, 4.4, -6.3);
+    add(new THREE.BoxGeometry(27, 5, 0.6), white, 0, 8, -6.3);                              // sign
+    add(new THREE.PlaneGeometry(25, 4), label('✦ themes ✦', 25, 4, '600 64px Georgia, serif'), 0, 8, -5.98).castShadow = false;
+    const DEFS = [
+      { id: 'classic', color: 0xff6fae, text: 'classic' },
+      { id: 'neon',    color: 0x8a2be2, text: 'neon', emissive: 0x5a1aff },
+      { id: null,      color: 0xbdb6c4, text: 'coming soon' },
+    ];
+    DEFS.forEach((d, i) => {
+      const x = (i - 1) * 12;
+      add(new THREE.CylinderGeometry(4.3, 4.6, 1.4, 48), dark, x, 1.5, 0);                  // housing
+      const cap = add(new THREE.CylinderGeometry(3.6, 3.6, 1.6, 48),
+        phys(d.color, d.emissive ? { emissive: d.emissive, emissiveIntensity: 0.6 } : {}), x, d.id === 'classic' ? 1.75 : 2.6, 0);
+      const lab = add(new THREE.PlaneGeometry(8, 1.9), label(d.text, 8, 1.9, '600 60px Georgia, serif'), x, 0.82, 5.6);
+      lab.rotation.x = -Math.PI/2; lab.castShadow = false;
+      themeButtons.push({ id: d.id, cap, x });
+    });
+    scene.add(g);
+    g.updateMatrixWorld(true);
+    for (const b of themeButtons) b.world = g.localToWorld(new THREE.Vector3(b.x, 0, 0));
   })();
-  let lastStep = 0, lastMusic = false, introSfx = 0;
+  const themeCaps = themeButtons.map(b => b.cap);
 
   const clock = new THREE.Clock();
   let elapsed = 0;
@@ -1597,27 +1361,15 @@
       if (styleArmed && pd < 5) enterStyle();
       else if (pd > 6.5) styleArmed = true;          // stepped off the pad → it works again next time
     }
-    if (introDone && dogMesh){
-      const bd = Math.hypot(dogRig.position.x - boombox.pad.x, dogRig.position.z - boombox.pad.z);
-      if (boomArmed && bd < 5){ boomArmed = false; sfx.padChime(); if (!musicOpen) openMusic(); else setMusicMin(!musicPanel.classList.contains('min')); }
-      else if (bd > 6.5) boomArmed = true;
-    }
-    boombox.update(dt, elapsed, musicPlaying);
-    grassUniforms.time.value = elapsed; grassUniforms.dogPos.value.copy(dogRig.position);
-    if (musicPlaying !== lastMusic){ lastMusic = musicPlaying; sfx.setDuck(musicPlaying); }
     dogRig.rotation.y = heading;
 
     if (dogMesh){
       walking = (move !== 0 || turning) && !airborne;
-      if (walking){
-        walkT += dt * 13 * Math.max(0.6, Math.abs(move)) * (running && move ? 1.6 : 1); deformWalk();
-        const st = Math.floor(walkT / Math.PI);                     // two paw-steps per stride → squeak
-        if (st !== lastStep){ lastStep = st; sfx.squeak(running && move); }
-      }
+      if (walking){ walkT += dt * 13 * Math.max(0.6, Math.abs(move)) * (running && move ? 1.6 : 1); deformWalk(); }
       else if (restPos){ restoreRest(); }
 
       // climb physics: follow the surface under the dog (dish floor, or up onto the palette)
-      const walk = [dishTop, isleTop, bridgeTop, parkTop, parkBridgeTop]; if (paletteObj) walk.push(paletteObj);
+      const walk = paletteObj ? [dishTop, isleTop, bridgeTop, paletteObj, ...themeCaps] : [dishTop, isleTop, bridgeTop, ...themeCaps];
       downRay.set(_downOrigin.set(dogRig.position.x, 300, dogRig.position.z), _down);
       let hit = downRay.intersectObjects(walk, true)[0];
       if (!hit){
@@ -1628,12 +1380,12 @@
       }
       if (hit) groundY = hit.point.y; else if (!airborne) groundY = dogRig.position.y;
       if (!introDone) wantJump = false;
-      if (wantJump && !airborne){ airborne = true; vy = JUMP_V; sfx.boing(); }
+      if (wantJump && !airborne){ airborne = true; vy = JUMP_V; }
       wantJump = false;
       if (airborne){
         dogRig.position.y += vy * dt; vy -= GRAVITY * dt;
         const floor = hit ? hit.point.y : groundY;
-        if (vy < 0 && dogRig.position.y <= floor){ dogRig.position.y = floor; airborne = false; vy = 0; sfx.thump(); }
+        if (vy < 0 && dogRig.position.y <= floor){ dogRig.position.y = floor; airborne = false; vy = 0; }
       } else if (hit) dogRig.position.y += (hit.point.y - dogRig.position.y) * Math.min(1, dt*10);
     }
 
@@ -1682,12 +1434,22 @@
     updateAtmosphere(dt, elapsed, camDist);
     for (const u of stationUpdaters) u(dt, elapsed);
 
-    renderer.render(scene, camera);
+    for (const b of themeButtons){
+      const target = b.id === theme ? 1.75 : 2.6;             // pressed / popped up
+      b.cap.position.y += (target - b.cap.position.y) * Math.min(1, dt * 12);
+      if (introDone && b.id && b.id !== theme &&
+          Math.hypot(dogRig.position.x - b.world.x, dogRig.position.z - b.world.z) < 3.4) switchTheme(b.id);
+    }
+    if (theme === 'neon'){
+      for (const [nm, src] of neonTracked) neonInto(src.color, nm.uniforms.color.value);   // dog glow follows its color
+      composer.render();
+    } else renderer.render(scene, camera);
   }
   animate();
   addEventListener('resize', ()=>{
     camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
     renderer.setSize(innerWidth, innerHeight);
+    composer.setSize(innerWidth, innerHeight);
   });
   </script>
 </body>
