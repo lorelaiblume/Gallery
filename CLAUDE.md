@@ -26,3 +26,7 @@ The old service account approach (`FIREBASE_SERVICE_ACCOUNT_LORELAI_BLUME_GALLER
 - Static HTML/CSS/JS (no framework, no bundler)
 - Firebase Firestore (database), Firebase Storage (media), Firebase Auth (Google sign-in)
 - Owner email: lorelaiblume@gmail.com (only this account can enter edit mode)
+
+## WebXR apps (Meta Quest)
+
+Before touching anything under `apps/` or `xr/`, read `xr/README.md` (start with its "On this site" section). In short: XR apps live in `apps/<name>/`; `xr/xr.py` is the dev/deploy tool (Lorelai runs it in Terminal on her Mac); `xr/` is never published (firebase.json ignores it); `version.txt` at the root is what makes headsets reload.

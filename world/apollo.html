@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Apollo's Larger Purpose — Lorelai Blume</title>
+  <meta name="description" content="An interactive timeline of the Space Race, from Lorelai Blume's research paper on Apollo as a worldwide symbol of American supremacy.">
+  <link rel="icon" href="/favicon.ico">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #05030c; --panel: #110c22; --panel-2: #181032; --line: rgba(181,140,255,0.22);
+      --text: #f4eefc; --soft: #cfc7e8; --muted: #8f88b0;
+      --pink: #ff6fae; --lav: #b58cff; --sky: #56c5f1; --gold: #f6d04a;
+      --ussr: #ef5566; --usa: #6a86ef;
+      --display: Archivo, "Helvetica Neue", Arial, sans-serif;
+      --serif: Georgia, "Times New Roman", serif;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 -apple-system, "Segoe UI", Karla, sans-serif;
+           overflow-x: hidden; }
+    a { color: var(--sky); }
+    #stars { position: fixed; inset: 0; z-index: 0; display: block; }
+
+    /* arrive from the rocket: the screen starts black and fades in */
+    #veil { position: fixed; inset: 0; background: #000; z-index: 100; pointer-events: none;
+            animation: unveil 2.2s ease-out .15s forwards; }
+    @keyframes unveil { to { opacity: 0; visibility: hidden; } }
+
+    /* ── hero ── */
+    .hero { position: relative; z-index: 2; min-height: 100vh; display: grid; place-items: center; text-align: center; padding: 0 16px; }
+    .hero .rise { opacity: 0; animation: rise 1.4s cubic-bezier(.2,.8,.2,1) forwards; }
+    .kicker { font-size: 12px; letter-spacing: .32em; text-transform: uppercase; color: #b9b2d6; animation-delay: 1.4s !important; }
+    .hero h1 { margin: 14px 0 8px; font: 800 clamp(34px, 7vw, 76px)/1.02 var(--display); letter-spacing: .01em; animation-delay: 1.8s !important; }
+    .hero .sub { font: italic 400 clamp(17px, 2.6vw, 24px)/1.3 var(--serif); color: #d9d2f0; animation-delay: 2.3s !important; }
+    .hero .by { margin-top: 22px; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: #9d96bd; animation-delay: 2.8s !important; }
+    .cue { position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%); color: var(--muted); font-size: 12px;
+           letter-spacing: .22em; text-transform: uppercase; text-decoration: none; opacity: 0; animation: fadein 1.2s ease 3.6s forwards; }
+    @keyframes fadein { to { opacity: 1; } }
+    .cue span { display: block; margin-top: 6px; font-size: 18px; animation: bob 1.8s ease-in-out infinite; }
+    @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+    @keyframes bob { 50% { transform: translateY(5px); } }
+
+    /* ── sticky HUD: year · prestige meter · chapter ── */
+    .hud { position: fixed; top: 0; left: 0; right: 0; z-index: 20; padding: 10px 16px;
+           display: grid; grid-template-columns: 1fr minmax(0, 420px) 1fr; align-items: center; gap: 16px;
+           background: linear-gradient(to bottom, rgba(5,3,12,0.94), rgba(5,3,12,0.78));
+           backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--line);
+           transform: translateY(-110%); transition: transform .45s cubic-bezier(.2,.8,.2,1); }
+    .hud.on { transform: none; }
+    .hud .year { font: 800 28px/1 var(--display); letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+    .hud .chapter { justify-self: end; text-align: right; font: italic 15px/1.2 var(--serif); color: var(--soft); }
+    .meter { text-align: center; }
+    .meter .lbl { font-size: 10px; letter-spacing: .24em; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
+    .meter .bar { position: relative; height: 10px; border-radius: 99px;
+                  background: linear-gradient(90deg, var(--ussr), #3a2450 50%, var(--usa)); }
+    .meter .mid { position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: rgba(255,255,255,0.35); }
+    .meter .knob { position: absolute; top: 50%; left: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%;
+                   background: #fff; box-shadow: 0 0 0 3px rgba(255,255,255,0.18), 0 0 16px rgba(255,255,255,0.7);
+                   transition: left .9s cubic-bezier(.3,1.3,.5,1); }
+    .meter .ends { display: flex; justify-content: space-between; margin-top: 5px; font-size: 11px; font-weight: 700; letter-spacing: .12em; }
+    .meter .ends b:first-child { color: var(--ussr); } .meter .ends b:last-child { color: var(--usa); }
+    .meter.off { opacity: .35; }
+    .meter.off .knob { opacity: 0; }
+    @media (max-width: 700px) {
+      .hud { grid-template-columns: auto 1fr; gap: 12px; padding: 8px 16px; }
+      .hud .chapter { display: none; }
+      .hud .year { font-size: 22px; }
+    }
+
+    /* ── timeline ── */
+    .timeline { position: relative; z-index: 2; max-width: 1100px; margin: 0 auto; padding: 60px 16px 40px; }
+    .rail { position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; margin-left: -1px; background: var(--line); }
+    .rail .fill { position: absolute; top: 0; left: 0; width: 100%; height: 0;
+                  background: linear-gradient(to bottom, var(--lav), var(--pink) 60%, var(--gold)); box-shadow: 0 0 12px rgba(255,111,174,0.6); }
+    .rail .ship { position: absolute; left: 50%; top: 0; width: 26px; height: 40px; margin: -20px 0 0 -13px;
+                  filter: drop-shadow(0 0 8px rgba(255,111,174,0.8)); }
+    .chapter-head { position: relative; text-align: center; margin: 90px auto 50px; max-width: 620px; padding: 22px 20px;
+                    background: var(--bg); }
+    .chapter-head .num { font-size: 11px; letter-spacing: .3em; text-transform: uppercase; color: var(--pink); }
+    .chapter-head h2 { margin: 8px 0 8px; font: 800 clamp(26px, 4.4vw, 40px)/1.08 var(--display); }
+    .chapter-head p { margin: 0; font: italic 17px/1.5 var(--serif); color: var(--soft); }
+
+    .event { position: relative; width: calc(50% - 46px); margin: 0 0 56px; }
+    .event.left { margin-right: auto; } .event.right { margin-left: auto; }
+    .event .dot { position: absolute; top: 26px; width: 14px; height: 14px; border-radius: 50%; background: var(--bg);
+                  border: 2px solid var(--lav); transition: background .3s, box-shadow .3s, border-color .3s; }
+    .event.left .dot { right: -53px; } .event.right .dot { left: -53px; }
+    .event.active .dot { background: var(--pink); border-color: var(--pink); box-shadow: 0 0 0 5px rgba(255,111,174,0.2), 0 0 18px var(--pink); }
+    .card { background: linear-gradient(160deg, var(--panel-2), var(--panel)); border: 1px solid var(--line); border-radius: 18px; overflow: hidden;
+            opacity: 0; transform: translateY(26px); transition: opacity .8s ease, transform .8s cubic-bezier(.2,.8,.2,1), border-color .3s; }
+    .event.seen .card { opacity: 1; transform: none; }
+    .event.active .card { border-color: rgba(255,111,174,0.55); }
+    .card figure { margin: 0; position: relative; background: #0b0717; }
+    .card img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
+    .card img.contain { object-fit: contain; background: #0b0717; }
+    .card figcaption { position: absolute; right: 8px; bottom: 6px; font-size: 10px; color: rgba(255,255,255,0.75);
+                       background: rgba(0,0,0,0.45); padding: 2px 7px; border-radius: 8px; }
+    .card figcaption a { color: inherit; text-decoration: none; }
+    .body { padding: 18px 20px 20px; }
+    .date { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase;
+            color: var(--gold); margin-bottom: 6px; }
+    .who { float: right; font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; padding: 3px 8px;
+           border-radius: 99px; margin-top: 1px; }
+    .who.usa { background: rgba(106,134,239,0.18); color: #9fb2ff; } .who.ussr { background: rgba(239,85,102,0.18); color: #ff8e9b; }
+    .card h3 { margin: 0 0 8px; font: 800 22px/1.18 var(--display); letter-spacing: .005em; clear: both; }
+    .card p { margin: 0 0 10px; color: var(--soft); }
+    blockquote { margin: 14px 0 6px; padding: 2px 0 2px 14px; border-left: 3px solid var(--pink); font: italic 18px/1.45 var(--serif); color: var(--text); }
+    blockquote cite { display: block; margin-top: 6px; font: normal 12px/1.3 -apple-system, sans-serif; letter-spacing: .06em; color: var(--muted); }
+    .stats { display: flex; gap: 12px; margin: 14px 0 6px; }
+    .stat { flex: 1; background: rgba(239,85,102,0.1); border: 1px solid rgba(239,85,102,0.3); border-radius: 12px; padding: 10px 12px; }
+    .stat b { display: block; font: 800 32px/1 var(--display); color: #ff8e9b; }
+    .stat span { display: block; margin-top: 6px; font-size: 12.5px; line-height: 1.35; color: var(--soft); }
+    .stat.usa { background: rgba(106,134,239,0.1); border-color: rgba(106,134,239,0.35); } .stat.usa b { color: #9fb2ff; }
+    details { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+    summary { cursor: pointer; list-style: none; font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--lav); }
+    summary::-webkit-details-marker { display: none; }
+    summary::after { content: ' ▾'; } details[open] summary::after { content: ' ▴'; }
+    details .excerpt { margin-top: 10px; font: 15.5px/1.65 var(--serif); color: #e3dcf5; }
+    details .excerpt p { color: inherit; margin: 0 0 10px; }
+
+    @media (max-width: 760px) {
+      .rail { left: 22px; }
+      .event, .event.left, .event.right { width: auto; margin-left: 46px; margin-right: 0; }
+      .event.left .dot, .event.right .dot { left: -31px; right: auto; }
+      .chapter-head { margin: 70px 0 40px 32px; text-align: left; padding: 16px 0 16px 14px; }
+    }
+
+    /* ── ending ── */
+    .ending { position: relative; z-index: 2; max-width: 760px; margin: 40px auto 0; padding: 60px 16px 40px; }
+    .ending h2 { font: 800 clamp(26px, 4.4vw, 40px)/1.1 var(--display); margin: 0 0 18px; text-align: center; }
+    .ending .thesis { font: 19px/1.7 var(--serif); color: #e8e1f7; }
+    .ending .note { margin-top: 26px; font-size: 13px; color: var(--muted); text-align: center; }
+    .sources { position: relative; z-index: 2; max-width: 760px; margin: 0 auto; padding: 10px 16px 90px; }
+    .sources details { border-top: 1px solid var(--line); }
+    .sources ol { margin: 14px 0 0; padding-left: 20px; font-size: 13.5px; line-height: 1.55; color: var(--soft); }
+    .sources li { margin-bottom: 8px; overflow-wrap: anywhere; }
+    .back { display: inline-block; margin: 30px auto 0; color: var(--muted); text-decoration: none; font-size: 0.75rem;
+            letter-spacing: 0.18em; text-transform: uppercase; }
+    .back:hover { color: var(--text); }
+    .corner { position: fixed; left: 16px; bottom: 14px; z-index: 21; margin: 0; padding: 7px 12px; border-radius: 99px;
+             background: rgba(5,3,12,0.8); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid var(--line); }
+    @media (max-width: 760px) { .corner { display: none; } }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      #veil, .hero .rise, .cue { animation-duration: .01s !important; animation-delay: 0s !important; }
+      .card { transition: none; opacity: 1; transform: none; }
+      .meter .knob { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="stars" aria-hidden="true"></canvas>
+
+  <header class="hero">
+    <div>
+      <div class="kicker rise">1630 – 1969</div>
+      <h1 class="rise">Apollo's Larger Purpose</h1>
+      <div class="sub rise">A Worldwide Symbol of American Supremacy</div>
+      <div class="by rise">Lorelai Blume</div>
+    </div>
+    <a class="cue" href="#timeline">scroll to launch<span>↓</span></a>
+  </header>
+
+  <div class="hud" id="hud" aria-live="polite">
+    <div class="year" id="hudYear">1630</div>
+    <div class="meter off" id="meter" title="Who the world saw as the leader, as the paper tells it">
+      <div class="lbl">Who's ahead in the world's eyes</div>
+      <div class="bar"><i class="mid"></i><i class="knob" id="knob"></i></div>
+      <div class="ends"><b>USSR</b><b>USA</b></div>
+    </div>
+    <div class="chapter" id="hudChapter"></div>
+  </div>
+
+  <main class="timeline" id="timeline">
+    <div class="rail" aria-hidden="true">
+      <div class="fill" id="fill"></div>
+      <svg class="ship" id="ship" viewBox="0 0 26 40" aria-hidden="true">
+        <!-- a little rocket, nose down: heading forward in time -->
+        <g transform="rotate(180 13 20)">
+          <path d="M13 2 C19 8 20 16 19 27 L7 27 C6 16 7 8 13 2 Z" fill="#f4eefc"/>
+          <circle cx="13" cy="14" r="3" fill="#56c5f1"/>
+          <path d="M7 20 L2 30 L7 28 Z M19 20 L24 30 L19 28 Z" fill="#ff6fae"/>
+          <path d="M9 28 L13 38 L17 28 Z" fill="#f6d04a"/>
+        </g>
+      </svg>
+    </div>
+    <div id="events"></div>
+  </main>
+
+  <section class="ending" id="ending">
+    <h2>A victory for mankind, with America at the center</h2>
+    <div class="thesis">
+      <p>The U.S., motivated by the concept of American exceptionalism and the humiliation of early losses to the Soviet Union, used the Apollo program to reassert its status on the global stage and fulfill its self-determined obligation to serve as a leader for the world. Through intentional motivation and widespread media coverage, the nation used space exploration and the moon landing as a demonstration of national capability and influence — portraying Apollo 11 as a triumph for all mankind, while reinforcing its own image as the driving force behind this milestone of human progress.</p>
+    </div>
+    <p class="note">The "who's ahead" meter illustrates the paper's argument about world opinion. It isn't a measured statistic.</p>
+  </section>
+
+  <section class="sources">
+    <details>
+      <summary>Bibliography</summary>
+      <ol id="bib"></ol>
+      <p style="font-size:12.5px;color:var(--muted);margin-top:16px">Photos: NASA and other public-domain sources via Wikimedia Commons, except the Goodwill Messages disc (© Steve Jurvetson, CC BY 2.0). Each photo's credit links to its source.</p>
+    </details>
+    <div style="text-align:center"><a class="back" href="roam.html">← back to the world</a></div>
+  </section>
+
+  <a class="back corner" href="roam.html">← the world</a>
+  <div id="veil"></div>
+
+  <script>
+  // ───────────────────────── content ─────────────────────────
+  // meter: -1 = the world sees the USSR ahead · +1 = the USA ahead · null = before the rivalry (meter dims)
+  const IMG = (file, w = 900) => 'https://commons.wikimedia.org/wiki/Special:FilePath/' + encodeURIComponent(file) + '?width=' + w;
+  const SRC = (file) => 'https://commons.wikimedia.org/wiki/File:' + encodeURIComponent(file.replace(/ /g, '_'));
+
+  const CHAPTERS = [
+    { num: 'Chapter I', title: 'A City Upon a Hill', lede: 'Long before rockets, Americans believed their nation was destined to lead the world.', events: [
+      { year: 1630, date: '1630', title: 'Winthrop\'s "city upon a hill"', meter: null,
+        img: 'John Winthrop 17th cent. American Antiquarian Society portrait.jpg', pos: 'center 22%', alt: '17th-century portrait of John Winthrop', credit: 'American Antiquarian Society',
+        text: 'Aboard the Arbella, Puritan John Winthrop told the settlers of the new Massachusetts Bay Colony that they would be watched by the whole world. His idea was later adapted into a broader vision of America\'s role on the global stage.',
+        quote: ['We shall be as a city upon a hill. The eyes of all people are upon us.', 'John Winthrop, 1630'] },
+      { year: 1835, date: '1835', title: 'Tocqueville names the idea', meter: null,
+        img: 'Alexis de tocqueville.jpg', pos: 'center 22%', alt: 'Portrait of Alexis de Tocqueville by Théodore Chassériau', credit: 'Théodore Chassériau',
+        text: 'In Democracy in America, Alexis de Tocqueville is credited with first articulating American exceptionalism: the belief that America\'s system of democracy and liberty is unique, and better than other systems of government.' },
+      { year: 1862, date: 'December 1, 1862', title: '"The last best hope of Earth"', meter: null,
+        img: 'President Lincoln on battle-field of Antietam, October, 1862 LOC 3252917325.jpg', alt: 'Abraham Lincoln at Antietam, October 1862', credit: 'Alexander Gardner / Library of Congress',
+        text: 'In his annual message to Congress, Lincoln described the United States as the world\'s best hope. For centuries this belief created an expectation that the U.S. would spearhead political and technological progress.',
+        quote: ['We shall nobly save, or meanly lose, the last best hope of earth.', 'Abraham Lincoln, 1862'] },
+    ]},
+    { num: 'Chapter II', title: 'Two Superpowers', lede: 'World War II ends, and a new rivalry begins, fought with rockets instead of armies.', events: [
+      { year: 1945, date: 'May 1945', title: 'The Cold War begins', meter: 0.45, who: 'both',
+        img: 'Yalta Conference 1945 Churchill, Stalin, Roosevelt (cropped 4-3).jpg', alt: 'Churchill, Roosevelt and Stalin at the Yalta Conference', credit: 'U.S. National Archives', photoNote: 'Allies at Yalta, February 1945',
+        text: 'After Nazi Germany surrendered, the USSR began installing governments in the Eastern European countries it had helped liberate. Soviet expansion threatened America\'s sense of national superiority and started decades of ideological conflict, political tension, and economic rivalry.' },
+      { year: 1945, date: '1945', title: 'Operation Paperclip', meter: 0.4, who: 'usa',
+        img: 'S-IC engines and Von Braun.jpg', pos: 'center 22%', alt: 'Wernher von Braun standing beneath the huge engines of a Saturn V first stage', credit: 'NASA', photoNote: 'Von Braun, later at NASA, with Saturn V engines',
+        text: 'The U.S. brought German and Austrian rocket scientists to America, including Wernher von Braun, a former SS officer and creator of the first long-range ballistic missile. The Soviets ran a similar operation. Because both sides had nuclear weapons, open war meant mutual destruction, so the competition moved into other arenas, including space.' },
+    ]},
+    { num: 'Chapter III', title: 'The Sputnik Shock', lede: 'The first win of the Space Race goes to the Soviets, and America\'s confidence cracks.', events: [
+      { year: 1957, date: 'October 4, 1957', title: 'Sputnik I reaches orbit', meter: -0.6, who: 'ussr',
+        img: 'Sputnik 1 satellite replica.png', contain: true, alt: 'Replica of Sputnik 1, a polished sphere with four long antennas', credit: 'Public domain',
+        text: 'The USSR launched the first satellite into Earth\'s orbit. It was the first major success in the Space Race, and Americans broadly saw it as a national humiliation. People asked whether the U.S. could ever catch up, and more broadly, "what is wrong with America?"',
+        quote: ['A nation which only 40 years ago was a nation of peasants…', 'Senator Lister Hill, on the Soviet Union'] },
+      { year: 1957, date: 'Weeks after Sputnik', title: 'The world changes its mind', meter: -0.7, who: 'ussr',
+        text: 'A U.S. Information Agency study found "a revolutionary revision of estimates of Soviet power and standing." In India, Afghanistan, Pakistan, and Greece, most people now saw the USSR as the leading technological superpower. Americans felt the same shift.',
+        stats: [['49%', 'of Americans thought Russia was moving ahead in rocket development'], ['67%', 'thought Russia was "ahead in the Cold War"']], statNote: 'Gallup poll, weeks after Sputnik' },
+      { year: 1958, date: 'July 29, 1958', title: 'America answers: NASA', meter: -0.5, who: 'usa',
+        img: 'Final Meeting of NACA - GPN-2002-000023.jpg', alt: 'Members of NACA seated around a long table at their final meeting in 1958', credit: 'NASA', photoNote: 'The last meeting of NACA, the agency NASA replaced',
+        text: 'Instead of accepting defeat, the U.S. mobilized. Eisenhower signed the National Aeronautics and Space Act, and NASA opened on October 1, 1958. The National Defense Education Act strengthened science and math in schools. Space had become a national priority.' },
+      { year: 1960, date: 'July 1960', title: 'NASA announces Project Apollo', meter: -0.6, who: 'usa',
+        text: 'At a NASA-Industry conference in Washington, NASA announced plans for Apollo. Even its own Chief of Manned Space Flight, George M. Low, expected a lunar landing might take years longer than the decade. That October, a New York Times headline read: "U.S. Survey Finds Others Consider Soviets Mightiest."' },
+    ]},
+    { num: 'Chapter IV', title: 'Falling Behind', lede: 'The Soviets put a man in orbit. America answers with a smaller flight and a big celebration.', events: [
+      { year: 1961, date: 'April 12, 1961', title: 'Gagarin orbits the Earth', meter: -0.85, who: 'ussr',
+        img: 'Yuri Gagarin (1961) - Restoration.jpg', pos: 'center 22%', alt: 'Portrait of cosmonaut Yuri Gagarin in 1961', credit: 'Arto Jousi / Finnish Museum of Photography',
+        text: 'Vostok 1 carried Yuri Gagarin into space, making him the first person there. He completed a full orbit in 89 minutes. Congratulations poured in from around the globe, including from Kennedy himself.',
+        quote: ['We congratulate you and the Soviet scientists and engineers who made this feat possible.', 'President Kennedy to the Soviet Embassy'] },
+      { year: 1961, date: 'May 5, 1961', title: 'Shepard\'s 15 minutes', meter: -0.55, who: 'usa',
+        img: 'Mercury-Redstone 3 Launch MSFC-6100884.jpg', alt: 'The Mercury-Redstone rocket carrying Freedom 7 lifting off', credit: 'NASA',
+        text: 'Just 23 days later, Alan Shepard flew on Freedom 7. His suborbital flight was hardly comparable to Gagarin\'s orbit, but the U.S. aired it live to millions, made Shepard a national hero, and gave him a medal at the White House. A modest achievement was made to look like America had caught up.' },
+    ]},
+    { num: 'Chapter V', title: 'The Challenge', lede: 'Kennedy sets a goal so ambitious that no nation could quickly exploit it.', events: [
+      { year: 1961, date: 'May 25, 1961', title: 'Kennedy asks Congress for the Moon', meter: -0.45, who: 'usa',
+        img: 'Kennedy Giving Historic Speech to Congress - GPN-2000-001658.jpg', alt: 'President Kennedy addressing a joint session of Congress', credit: 'NASA',
+        text: 'Kennedy called on the nation to land a man on the moon before the decade was out. The Space Race was not only about exploration but about "the minds of men everywhere," as nations decided which road to take.',
+        quote: ['While we cannot guarantee that we shall one day be first, we can guarantee that any failure to make this effort will make us last.', 'John F. Kennedy, message to Congress'] },
+      { year: 1962, date: 'September 12, 1962', title: '"We choose to go to the Moon"', meter: -0.35, who: 'usa',
+        img: 'Kennedy at Rice University - Flickr - NASA on The Commons.jpg', pos: 'center 22%', alt: 'President Kennedy speaking at Rice University stadium', credit: 'NASA on The Commons',
+        text: 'At Rice University, Kennedy framed space as a test of leadership itself. American participation wasn\'t just about competing, but about guiding human progress.',
+        quote: ['No nation which expects to be the leader of other nations can expect to stay behind in the race for space.', 'John F. Kennedy, Rice University'] },
+    ]},
+    { num: 'Chapter VI', title: 'Trial by Fire', lede: 'A tragedy on the launch pad, and a comeback built for television.', events: [
+      { year: 1967, date: 'January 27, 1967', title: 'The Apollo 1 fire', meter: -0.5, who: 'usa',
+        img: 'Apollo 1 Grissom, Chaffee and White in simulator.jpg', pos: 'center 22%', alt: 'Gus Grissom, Ed White and Roger Chaffee in a simulator', credit: 'NASA',
+        text: 'During a routine test, fire broke out in the command module, whose atmosphere was pure oxygen. It took five minutes to open the hatch, and Gus Grissom, Ed White, and Roger Chaffee were killed. Flight director Gene Kranz took responsibility on behalf of NASA.',
+        quote: ['We were too gung-ho about the schedule, and we locked out all of the problems we saw each day in our work.', 'Gene Kranz, flight director'] },
+      { year: 1968, date: 'October 11, 1968', title: 'Apollo 7: live TV from space', meter: -0.2, who: 'usa',
+        img: 'Saturn IB-Apollo 7 lifts off.jpg', alt: 'A Saturn IB rocket lifting off with Apollo 7', credit: 'NASA',
+        text: 'After a nearly two-year delay, Wally Schirra, Walt Cunningham, and Donn Eisele flew the first crewed Apollo mission. One of its goals was to test live television broadcasts from space, which was crucial for showing the world America\'s success.' },
+    ]},
+    { num: 'Chapter VII', title: 'The World Is Watching', lede: 'On Christmas Eve, America speaks to a billion people from the Moon.', events: [
+      { year: 1968, date: 'December 24, 1968', title: 'Apollo 8: Genesis and Earthrise', meter: 0.35, who: 'usa',
+        img: 'NASA-Apollo8-Dec24-Earthrise.jpg', alt: 'Earthrise: the Earth rising over the Moon\'s horizon, photographed from Apollo 8', credit: 'NASA / Bill Anders',
+        text: 'Frank Borman, Jim Lovell, and Bill Anders became the farthest-traveled humans in history. On the advice of USIA science advisor Simon Bourgin, they read the opening of Genesis to about one billion listeners. A BBC correspondent called it a "stroke of genius," and hundreds of thousands of letters poured in. Together with Anders\'s Earthrise photo, the broadcast framed American power in space as a gift to the world.',
+        quote: ['From the crew of Apollo 8, we close with good night, good luck, Merry Christmas, and God bless all of you — all of you on the good Earth.', 'Frank Borman, Christmas Eve broadcast'] },
+    ]},
+    { num: 'Chapter VIII', title: 'Selling the Moon', lede: 'Months before launch, the U.S. prepares the biggest media campaign in history.', events: [
+      { year: 1969, date: 'January 1969', title: 'The crew is chosen', meter: 0.4, who: 'usa',
+        img: 'Apollo 11 Crew.jpg', alt: 'Official portrait of Neil Armstrong, Michael Collins and Buzz Aldrin', credit: 'NASA',
+        text: 'NASA selected Neil Armstrong, Buzz Aldrin, and Michael Collins. Press kits covered everything from the spacecraft to the astronauts\' birthplaces, marriages, and children. LIFE photographer Ralph Morse photographed the crews at home so often that "the kids got used to me being around." America\'s astronauts became relatable family men.' },
+      { year: 1969, date: 'Early 1969', title: 'The USIA takes charge of the story', meter: 0.5, who: 'usa',
+        img: 'Thousands of News Reporters Watch Apollo 11 Lift Off.jpg', alt: 'Crowds of news reporters at the press site watching the Apollo 11 launch', credit: 'NASA',
+        text: 'The U.S. Information Agency created an Apollo 11 task force. It hosted 611 foreign correspondents from Japan to Portugal and needed four times the usual press space. It urged the White House to invite Soviet cosmonauts to watch, and asked the Post Office for a commemorative stamp that wasn\'t "boastful." The plan was to present Apollo as a victory for mankind while making sure everyone knew who made it happen.',
+        quote: ['Apollo 11, as a U.S. feat, speaks for itself… To promote it as a U.S. feat is unnecessary.', 'USIA guidelines, 1969'] },
+      { year: 1969, date: 'July 16, 1969', title: 'Liftoff', meter: 0.6, who: 'usa',
+        img: 'Apollo 11 Launch - GPN-2000-000630.jpg', alt: 'The Saturn V rocket carrying Apollo 11 lifting off', credit: 'NASA',
+        text: 'The Saturn V carried Apollo 11 toward the Moon while Voice of America broadcast in several languages and reporters from around the world watched from the press site.' },
+    ]},
+    { num: 'Chapter IX', title: 'One Giant Leap', lede: 'A triumph for humanity, carefully staged to carry an American message.', events: [
+      { year: 1969, date: 'July 20, 1969', title: 'Men walk on the Moon', meter: 0.9, who: 'usa',
+        img: 'Aldrin Apollo 11 original.jpg', alt: 'Buzz Aldrin standing on the Moon, with Neil Armstrong reflected in his visor', credit: 'NASA / Neil Armstrong',
+        text: 'About 600 million people watched Neil Armstrong step onto the lunar surface, and an estimated 500 million more listened on Voice of America. The astronauts collected samples, planted the American flag, and left medallions honoring the Apollo 1 crew.',
+        quote: ['That\'s one small step for man, one giant leap for mankind.', 'Neil Armstrong'] },
+      { year: 1969, date: 'July 20, 1969', title: '"We came in peace for all mankind"', meter: 0.9, who: 'usa',
+        img: 'Apollo 11 plaque closeup on Moon.jpg', alt: 'The plaque on the Apollo 11 lunar module ladder', credit: 'NASA',
+        text: 'The plaque left on the Moon speaks for everyone, but it is signed by the astronauts and by President Nixon. It shows the same balance: a gift to all humanity, delivered by the United States.' },
+      { year: 1969, date: 'July 20, 1969', title: 'Messages from 73 nations', meter: 0.9, who: 'usa',
+        img: 'Apollo 11 Goodwill Messages disc left on Earth.jpg', pos: 'center 22%', alt: 'A copy of the small silicon disc carrying goodwill messages from world leaders', credit: 'Steve Jurvetson, CC BY 2.0', lic: true,
+        text: 'A small disc carried goodwill statements from 73 countries, including several aligned with or controlled by the USSR, plus messages from the four U.S. presidents who oversaw Apollo.',
+        quote: ['The journey of the astronauts is more than a technical achievement; it is a reaching-out of the human spirit.', 'Richard Nixon, on the goodwill disc'] },
+    ]},
+    { num: 'Chapter X', title: 'Keeping the Magic Alive', lede: 'After the landing, the U.S. reviews its campaign and plans to keep it going.', events: [
+      { year: 1969, date: 'August 6, 1969', title: 'The USIA looks back', meter: 0.85, who: 'usa',
+        text: 'In a report after the landing, the USIA reviewed its films, press materials, publications, and NASA-trained lecturers traveling with mobile exhibits around the world, and judged the effort extremely successful. Its stated goal makes the real objective clear: American prestige.',
+        quote: ['…to keep alive the world\'s respect and affection for America and the sense of unity among mankind which Apollo 11 produced to such a miraculous extent.', 'USIA, "Apollo 11 and the U.S. Information Agency"'] },
+    ]},
+  ];
+
+  const BIB = [
+    ['"About Apollo 7, the First Crewed Apollo Space Mission." NASA, 2015.', 'https://www.nasa.gov/missions/apollo/about-apollo-7-the-first-crewed-apollo-space-mission/'],
+    ['"American Exceptionalism." EBSCO Research Starters, 2025.', 'https://www.ebsco.com/research-starters/political-science/american-exceptionalism'],
+    ['"Apollo Missions." NASA.', 'https://www.nasa.gov/specials/apollo50th/missions.html'],
+    ['Cosgrove, Ben. "Up Close and Personal with Apollo 11: A LIFE Photographer\'s Story." LIFE.', 'https://www.life.com/history/up-close-and-personal-with-apollo-11-a-life-photographers-story/'],
+    ['Ertel, Ivan D. "Notes and Documents: Apollo." The Southwestern Historical Quarterly 73, no. 2 (1969): 213–34.', 'https://www.jstor.org/stable/30236571'],
+    ['File SP 10 Space Flight and Exploration–Apollo 11, Office of Policy and Plans, Subject Files, 1966–70 (NAID 5989363), RG 306: Records of the United States Information Agency.'],
+    ['IOP – Apollo 11 Operations Office. Memorandum, "Apollo 11 and the U.S. Information Agency," August 6, 1969.', 'https://text-message.blogs.archives.gov/2019/08/06/apollo-11-telling-the-story-around-the-world-post-mortem/'],
+    ['Kennedy, John F. "Telegram From the Department of State to the Embassy in the Soviet Union," April 12, 1961.', 'https://history.state.gov/historicaldocuments/frus1961-63v06/d8'],
+    ['Kennedy, John F. "Special Message to the Congress on Urgent National Needs." May 25, 1961. JFK Presidential Library.', 'https://www.jfklibrary.org/archives/other-resources/john-f-kennedy-speeches/united-states-congress-special-message-19610525'],
+    ['Kennedy, John F. "We Choose to Go to the Moon." Rice University, September 12, 1962.', 'https://www.rice.edu/jfk-speech'],
+    ['Lapidus, Robert D. "Sputnik and Its Repercussions: A Historical Catalyst." Aerospace Historian 17, no. 2/3 (1970): 88–93.', 'https://www.jstor.org/stable/44522392'],
+    ['Lincoln, Abraham. "Second Annual Message." December 1, 1862. Miller Center.', 'https://millercenter.org/the-presidency/presidential-speeches/december-1-1862-second-annual-message'],
+    ['Mandel, Savannah. "Trial by Fire: The Legacy of Apollo 1." American Institute of Physics, 2019.', 'https://www.aip.org/news/trial-fire-legacy-apollo-1'],
+    ['Memorandum to William P. Rogers, June 30, 1969. National Archives.', 'https://text-message.blogs.archives.gov/2019/06/25/apollo-11-telling-the-story-around-the-world/'],
+    ['"The Military Rockets That Launched the Space Age." Smithsonian National Air and Space Museum, 2023.', 'https://airandspace.si.edu/stories/editorial/military-rockets-launched-space-age'],
+    ['Muir-Harmony, Teasel. "How Apollo 8 Delivered Christmas Eve Peace and Understanding to the World." Smithsonian Magazine, 2020.', 'https://www.smithsonianmag.com/smithsonian-institution/how-apollo-8-delivered-moment-christmas-eve-peace-and-understanding-world-180976431/'],
+    ['NASA. Apollo 11 Goodwill Messages. July 13, 1969.', 'https://www.nasa.gov/wp-content/uploads/2024/05/apollo-11-goodwill-messages.pdf'],
+    ['NASA. "Apollo 11 Lunar Landing Mission." Press kit, July 6, 1969.', 'https://www.nasa.gov/wp-content/uploads/static/apollo50th/pdf/A11_PressKit.pdf'],
+    ['Neufeld, Michael. "Project Paperclip and American Rocketry after World War II." Smithsonian National Air and Space Museum, 2023.', 'https://airandspace.si.edu/stories/editorial/project-paperclip-and-american-rocketry-after-world-war-ii'],
+    ['The New York Times. "Kennedy Praises Soviet Space Trip." April 13, 1961.', 'https://timesmachine.nytimes.com/timesmachine/1961/04/13/101456035.html?pageNumber=15'],
+    ['The New York Times. "President Will Give Medal to Astronaut." May 7, 1961.', 'https://timesmachine.nytimes.com/timesmachine/1961/05/07/118908727.html?pageNumber=58'],
+    ['The New York Times. "US Survey Finds Others Consider Soviets Mightiest." October 25, 1960.', 'https://timesmachine.nytimes.com/timesmachine/1960/10/25/99813937.html?pageNumber=1'],
+    ['Payne, Rodger A. "Public Opinion and Foreign Threats: Eisenhower\'s Response to Sputnik." Armed Forces & Society 21, no. 1 (1994): 89–111.', 'https://www.jstor.org/stable/45346640'],
+    ['Rios, Danielle, et al. "America and the Race to the Moon." Digital Public Library of America, 2015.', 'https://dp.la/exhibitions/race-to-the-moon'],
+    ['"Soviet cosmonaut Yuri Gagarin becomes the first man in space." History.', 'https://www.history.com/this-day-in-history/april-12/first-man-in-space'],
+    ['Stamm, Amy. "Light This Candle: What You Need to Know About Alan Shepard\'s Historic Spaceflight." Smithsonian National Air and Space Museum, 2021.', 'https://airandspace.si.edu/stories/editorial/alan-shepard-freedom-7'],
+    ['Uri, John. "65 Years Ago: The National Aeronautics and Space Act of 1958 Creates NASA." NASA, 2023.', 'https://www.nasa.gov/history/65-years-ago-the-national-aeronautics-and-space-act-of-1958-creates-nasa/'],
+    ['USIA. Letter to Mr. Loomis, "Apollo 11 – Care of Foreign Correspondents," July 11, 1969.', 'https://text-message.blogs.archives.gov/2019/07/'],
+    ['USIA Office of Research and Analysis. "Impact of US and Soviet Space Programs on World Opinion: A Summary Assessment." July 7, 1959.', 'https://www.nasa.gov/history/sputnik/july59.html'],
+    ['U.S. Information Agency, Survey of Coordination of Apollo Project (Oct. 1969).', 'https://text-message.blogs.archives.gov/2019/08/06/apollo-11-telling-the-story-around-the-world-post-mortem/'],
+    ['"What Was the Space Race?" Smithsonian National Air and Space Museum, 2023.', 'https://airandspace.si.edu/stories/editorial/what-was-space-race'],
+    ['Wilford, John Noble. We Reach the Moon. The New York Times, 1969.'],
+    ['Winthrop, John. "Dreams of a City on a Hill." The Arbella, 1630. American Yawp Reader.', 'https://www.americanyawp.com/reader/colliding-cultures/john-winthrop-dreams-of-a-city-on-a-hill-1630/'],
+  ];
+
+  // ───────────────────────── build the page ─────────────────────────
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const host = document.getElementById('events');
+  let side = 0;
+  for (const ch of CHAPTERS){
+    const head = document.createElement('div');
+    head.className = 'chapter-head';
+    head.innerHTML = `<div class="num">${esc(ch.num)}</div><h2>${esc(ch.title)}</h2><p>${esc(ch.lede)}</p>`;
+    host.appendChild(head);
+    for (const e of ch.events){
+      const el = document.createElement('article');
+      el.className = 'event ' + (side++ % 2 ? 'right' : 'left');
+      el.dataset.year = e.year; el.dataset.chapter = ch.title;
+      if (e.meter !== null && e.meter !== undefined) el.dataset.meter = e.meter;
+      const who = e.who === 'usa' ? '<span class="who usa">USA</span>' : e.who === 'ussr' ? '<span class="who ussr">USSR</span>' : '';
+      const fig = e.img ? `<figure><img ${e.contain ? 'class="contain"' : ''} loading="lazy" decoding="async" src="${IMG(e.img)}" ${e.pos ? `style="object-position:${e.pos}"` : ''} alt="${esc(e.alt)}"
+          onerror="this.closest('figure').remove()"><figcaption><a href="${SRC(e.img)}" target="_blank" rel="noopener">${e.photoNote ? esc(e.photoNote) + ' · ' : ''}${esc(e.credit)}</a></figcaption></figure>` : '';
+      const quote = e.quote ? `<blockquote>“${esc(e.quote[0])}”<cite>${esc(e.quote[1])}</cite></blockquote>` : '';
+      const stats = e.stats ? `<div class="stats">${e.stats.map(([n, t]) => `<div class="stat"><b>${esc(n)}</b><span>${esc(t)}</span></div>`).join('')}</div>
+          <p style="font-size:12px;color:var(--muted);margin:0">${esc(e.statNote)}</p>` : '';
+      el.innerHTML = `<i class="dot" aria-hidden="true"></i><div class="card">${fig}<div class="body">
+          ${who}<span class="date">${esc(e.date)}</span><h3>${esc(e.title)}</h3><p>${esc(e.text)}</p>${stats}${quote}</div></div>`;
+      host.appendChild(el);
+    }
+  }
+  const bib = document.getElementById('bib');
+  for (const [t, u] of BIB){
+    const li = document.createElement('li');
+    li.innerHTML = esc(t) + (u ? ` <a href="${esc(u)}" target="_blank" rel="noopener">link</a>` : '');
+    bib.appendChild(li);
+  }
+
+  // ───────────────────────── scroll behaviour ─────────────────────────
+  const hud = document.getElementById('hud'), hudYear = document.getElementById('hudYear'), hudCh = document.getElementById('hudChapter');
+  const meter = document.getElementById('meter'), knob = document.getElementById('knob');
+  const timeline = document.getElementById('timeline'), fill = document.getElementById('fill'), ship = document.getElementById('ship');
+  const events = [...document.querySelectorAll('.event')];
+
+  // cards fade up as they come into view
+  const seenIO = new IntersectionObserver(es => es.forEach(x => { if (x.isIntersecting){ x.target.classList.add('seen'); seenIO.unobserve(x.target); } }),
+    { rootMargin: '0px 0px -12% 0px' });
+  events.forEach(e => seenIO.observe(e));
+
+  // the year ticks (counts up/down to the new year)
+  let shownYear = 1630, yearTarget = 1630, yearRAF = 0;
+  function setYear(y){
+    yearTarget = y; if (yearRAF) return;
+    const step = () => {
+      const d = yearTarget - shownYear;
+      if (d === 0){ yearRAF = 0; return; }
+      shownYear += Math.sign(d) * Math.max(1, Math.round(Math.abs(d) / 6));
+      hudYear.textContent = shownYear;
+      yearRAF = requestAnimationFrame(step);
+    };
+    yearRAF = requestAnimationFrame(step);
+  }
+  function setActive(el){
+    events.forEach(e => e.classList.toggle('active', e === el));
+    setYear(+el.dataset.year);
+    hudCh.textContent = el.dataset.chapter;
+    if (el.dataset.meter !== undefined){
+      meter.classList.remove('off');
+      knob.style.left = (50 + 50 * (+el.dataset.meter) * 0.92) + '%';
+    } else meter.classList.add('off');
+  }
+
+  let active = null;
+  function onScroll(){
+    const vh = innerHeight;
+    // HUD shows once you're into the timeline
+    hud.classList.toggle('on', timeline.getBoundingClientRect().top < vh * 0.55);
+    // the event nearest the middle of the screen is "now"
+    let best = null, bestD = Infinity;
+    for (const e of events){
+      const r = e.getBoundingClientRect(); const c = (r.top + Math.min(r.bottom, r.top + 260)) / 2;
+      const d = Math.abs(c - vh * 0.45); if (d < bestD){ bestD = d; best = e; }
+    }
+    if (best && best !== active){ active = best; setActive(best); }
+    // the rail fills to the middle of the screen; the little rocket rides the tip
+    const tr = timeline.getBoundingClientRect();
+    const h = Math.max(0, Math.min(tr.height, vh * 0.5 - tr.top));
+    fill.style.height = h + 'px'; ship.style.top = h + 'px';
+  }
+  addEventListener('scroll', onScroll, { passive: true });
+  addEventListener('resize', onScroll);
+  onScroll();
+
+  // ───────────────────────── starfield ─────────────────────────
+  const c = document.getElementById('stars'), g = c.getContext('2d');
+  let W, H, stars = [];
+  function size(){
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    W = innerWidth; H = innerHeight; c.width = W*dpr; c.height = H*dpr; c.style.width = W+'px'; c.style.height = H+'px';
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    stars = Array.from({ length: Math.round(W*H/2600) }, () => ({ x: Math.random()*W, y: Math.random()*H, z: Math.random() }));
+  }
+  size(); addEventListener('resize', size);
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let last = performance.now(), lastScroll = scrollY, drift = 0;
+  (function frame(now){
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    drift += (scrollY - lastScroll) * 0.15; lastScroll = scrollY; drift *= 0.9;   // scrolling pushes the stars past faster
+    g.fillStyle = '#05030c'; g.fillRect(0, 0, W, H);
+    for (const s of stars){
+      if (!still){ s.y -= ((4 + s.z*26) * dt + drift * s.z * 0.08); if (s.y < 0) { s.y += H; s.x = Math.random()*W; } if (s.y > H) s.y -= H; }
+      const r = 0.3 + s.z*1.3, tw = 0.55 + 0.45*Math.sin(now/700 + s.x);
+      g.globalAlpha = (0.25 + 0.75*s.z) * tw; g.fillStyle = s.z > 0.93 ? '#ffd9f2' : '#fff';
+      g.beginPath(); g.arc(s.x, s.y, r, 0, Math.PI*2); g.fill();
+    }
+    g.globalAlpha = 1;
+    requestAnimationFrame(frame);
+  })(last);
+  </script>
+</body>
+</html>
