@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Roam — Lorelai Blume</title>
-  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;800&display=swap" rel="stylesheet">
   <style>
     :root { color-scheme: dark; }
     html, body { margin: 0; height: 100%; overflow: hidden; background: #f9e0ef;
@@ -15,6 +15,8 @@
                font-size: 14px; color: #a24b7d; background: #f9e0ef;
                transition: opacity 0.35s ease; }
     #loading.done { opacity: 0; pointer-events: none; }
+    .caption { transition: opacity 1.2s ease; }
+    .caption.gone { opacity: 0 !important; pointer-events: none; }
     .caption { position: fixed; left: 50%; top: 18px; transform: translateX(-50%);
       z-index: 10; color: #a24b7d; font-size: 13px; letter-spacing: .03em; background: rgba(255,255,255,0.5);
       padding: 6px 14px; border-radius: 20px; }
@@ -31,31 +33,38 @@
       border-radius: 50%; border: 0; background: rgba(162,75,125,0.55); color: #fff;
       font: 700 13px/1 -apple-system, sans-serif; letter-spacing: .05em; display: none; }
     @media (pointer: coarse) { #jumpBtn { display: block; } }
-    #stylePanel { position: fixed; right: 22px; top: 50%; width: 250px; z-index: 25; padding: 18px 18px 14px;
-      transform: translate(calc(100% + 40px), -50%); transition: transform .45s cubic-bezier(.2,.9,.3,1.2);
-      background: rgba(255,255,255,0.72); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-      border-radius: 22px; box-shadow: 0 10px 40px rgba(162,75,125,0.25); color: #a24b7d; }
+    #stylePanel { position: fixed; right: 22px; top: 50%; width: 300px; z-index: 25; padding: 26px 26px 22px;
+      transform: translate(calc(100% + 40px), -50%); transition: transform .45s cubic-bezier(.2,.8,.2,1);
+      background: rgba(255,255,255,0.55); backdrop-filter: blur(18px) saturate(1.2); -webkit-backdrop-filter: blur(18px) saturate(1.2);
+      border: 1px solid rgba(255,255,255,0.7); border-radius: 16px; box-shadow: 0 18px 50px rgba(90,30,70,0.16);
+      color: #1d1d1f; font-family: Archivo, "Helvetica Neue", Arial, sans-serif; }
     #stylePanel.open { transform: translate(0, -50%); }
-    #stylePanel h2 { margin: 0 0 12px; font: 700 18px/1.1 Georgia, serif; text-align: center; letter-spacing: .02em; }
-    #stylePanel .sec { margin-bottom: 14px; }
-    #stylePanel .sec > span { display: block; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; margin-bottom: 7px; opacity: .8; }
-    #stylePanel .swatches { display: grid; grid-template-columns: repeat(6, 1fr); gap: 7px; }
-    #stylePanel .sw { width: 100%; aspect-ratio: 1; border-radius: 50%; border: 2px solid rgba(255,255,255,0.9);
-      box-shadow: 0 1px 4px rgba(0,0,0,0.15); cursor: pointer; padding: 0; }
-    #stylePanel .sw.on { outline: 3px solid #a24b7d; outline-offset: 1px; }
+    #stylePanel h2 { margin: 0 0 4px; font: 800 13px/1.2 Archivo, "Helvetica Neue", Arial, sans-serif; letter-spacing: .24em; text-transform: uppercase; }
+    #stylePanel .sub { margin: 0 0 4px; font: 400 13px/1.4 Archivo, "Helvetica Neue", Arial, sans-serif; color: #6e6a72; }
+    #stylePanel .sec > span { display: block; font: 600 11px/1 Archivo, "Helvetica Neue", Arial, sans-serif; letter-spacing: .2em;
+      text-transform: uppercase; color: #6e6a72; margin: 20px 0 10px; }
+    #stylePanel .swatches { display: grid; grid-template-columns: repeat(6, 28px); justify-content: space-between; row-gap: 12px; }
+    #stylePanel .sw { width: 28px; height: 28px; border-radius: 6px; border: 0; padding: 0; cursor: pointer;
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08); transition: transform .15s; }
+    #stylePanel .sw:hover { transform: scale(1.08); }
+    #stylePanel .sw.on { outline: 2px solid #1d1d1f; outline-offset: 2px; }
     #stylePanel .sw.custom { background: conic-gradient(#ff6fae, #f6b74a, #a9e05a, #56c5f1, #b58cff, #ff6fae); position: relative; overflow: hidden; }
     #stylePanel .sw.custom input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
-    #stylePanel .opts { display: flex; flex-wrap: wrap; gap: 6px; }
-    #stylePanel .opt { border: 0; border-radius: 999px; padding: 6px 11px; font: 600 12px/1 -apple-system, sans-serif;
-      background: rgba(162,75,125,0.12); color: #a24b7d; cursor: pointer; }
-    #stylePanel .opt.on { background: #a24b7d; color: #fff; }
-    #styleDone { width: 100%; border: 0; border-radius: 999px; padding: 10px; margin-top: 4px; cursor: pointer;
-      background: linear-gradient(90deg, #ff6fae, #b58cff); color: #fff; font: 700 14px/1 -apple-system, sans-serif; }
-    #stylePanel .hint { margin: 7px 0 0; font-size: 11px; text-align: center; opacity: .65; }
+    #stylePanel .opts { display: flex; border-bottom: 1px solid rgba(29,29,31,0.14); }
+    #stylePanel .opt { flex: 1; border: 0; background: none; padding: 9px 0; cursor: pointer; color: #6e6a72;
+      font: 500 13px/1 Archivo, "Helvetica Neue", Arial, sans-serif; transition: color .15s, box-shadow .15s; }
+    #stylePanel .opt:hover { color: #1d1d1f; }
+    #stylePanel .opt.on { color: #1d1d1f; box-shadow: inset 0 -2px #1d1d1f; }
+    #stylePanel .foot { margin-top: 26px; display: flex; justify-content: space-between; align-items: center; }
+    #stylePanel .hint { margin: 0; font: 400 12px/1 Archivo, "Helvetica Neue", Arial, sans-serif; color: #6e6a72; }
+    #styleDone { border: 0; border-radius: 8px; padding: 11px 22px; cursor: pointer; background: #1d1d1f; color: #fff;
+      font: 600 13px/1 Archivo, "Helvetica Neue", Arial, sans-serif; letter-spacing: .1em; }
+    #styleDone:hover { background: #000; }
     @media (max-width: 700px) {
       #stylePanel { left: 12px; right: 12px; top: auto; bottom: 12px; width: auto; transform: translateY(calc(100% + 30px)); }
       #stylePanel.open { transform: translateY(0); }
       #stylePanel .swatches { grid-template-columns: repeat(11, 1fr); }
+      #stylePanel .sw { width: 100%; height: auto; aspect-ratio: 1; }
     }
     #musicPanel { position: fixed; left: 16px; bottom: 40px; width: 340px; max-width: calc(100vw - 32px); z-index: 24;
       background: rgba(255,255,255,0.72); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
@@ -107,14 +116,12 @@
     <div id="mBody"></div>
   </div>
   <div id="stylePanel" aria-hidden="true">
-    <h2>style your pup</h2>
-    <div class="sec"><span>color</span><div class="swatches" id="swatches"></div></div>
-    <div class="sec"><span>finish</span><div class="opts" id="finishOpts"></div></div>
-    <div class="sec"><span>accessory</span><div class="opts" id="hatOpts"></div></div>
-    <button id="styleDone">done ✓</button>
-    <p class="hint">or just walk away</p>
+    <h2>Style your pup</h2>
+    <p class="sub">Changes save automatically.</p>
+    <div class="sec"><span>Color</span><div class="swatches" id="swatches"></div></div>
+    <div class="sec"><span>Finish</span><div class="opts" id="finishOpts"></div></div>
+    <div class="foot"><p class="hint">Esc to close</p><button id="styleDone">DONE</button></div>
   </div>
-  <a class="home" href="/">← Lorelai Blume</a>
   <div id="flash"></div>
   <div id="blackout"></div>
 
@@ -129,6 +136,7 @@
   import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
   import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
   import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+  import { Reflector } from 'three/addons/objects/Reflector.js';
   import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
   import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
   import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -179,7 +187,7 @@
   const SUN_OFF = new THREE.Vector3(30, 50, 20).normalize().multiplyScalar(250);   // sun + shadow box follow the dog
 
   // ── the dish: a small finite pink disk floating in the pale-pink void ──
-  const DISH_R = 110, DISH_TH = 12;
+  const DISH_R = 75, DISH_TH = 12;
   const dish = new THREE.Group();
   const dishTop = new THREE.Mesh(
     new THREE.CircleGeometry(DISH_R, 96),
@@ -269,11 +277,7 @@
       halos.push({ grp: g, core, glow, phase: Math.random()*Math.PI*2 });
     }
     makeHalo(0, 0);                                  // center
-    for (let i = 0; i < 5; i++){                     // evenly spaced on the loop path
-      if (i === 4) continue;                          // #4 = balloon lab
-      const a = (i/5)*Math.PI*2 - Math.PI/2;         // first one at the top
-      makeHalo(Math.cos(a)*PATH_R, Math.sin(a)*PATH_R);
-    }
+    // (the placeholder halos around the rim were removed — only the spawn halo remains)
   })();
 
   // ── rainbow spoke paths: flat, same width as the loop, from center out to each rim halo ──
@@ -317,7 +321,7 @@
   // ================= portal island: rocket, popcorn + palette, reached by a rainbow bridge =================
   const BRIDGE_A = (2/5)*Math.PI*2 - Math.PI/2;             // the bridge continues spoke #2 off the big dish
   const BRIDGE_DIR = new THREE.Vector3(Math.cos(BRIDGE_A), 0, Math.sin(BRIDGE_A));
-  const ISLE_R = 110, GAP = 110, ISLE_PATH_R = 62;
+  const ISLE_R = 110, GAP = 60, ISLE_PATH_R = 62;
   const ISLE_C = BRIDGE_DIR.clone().multiplyScalar(DISH_R + GAP + ISLE_R);
   const HEADING0 = Math.atan2(BRIDGE_DIR.x, BRIDGE_DIR.z);   // the dog spawns facing the bridge
   // the three portals sit in a semicircle on the island's loop, across from the bridge.
@@ -398,9 +402,10 @@
   // ================= the park: a grassy island, reached by a second rainbow bridge =================
   const PARK_A = (1/5)*Math.PI*2 - Math.PI/2;                // leaves from rim spot #1 (front-left of the spawn)
   const PARK_DIR = new THREE.Vector3(Math.cos(PARK_A), 0, Math.sin(PARK_A));
-  const PARK_R = 120, PARK_GAP = 100;
+  const PARK_R = 120, PARK_GAP = 80;
+  const PARK_ON = false;                                        // the soccer park is off for now (flip to true to bring it back)
   const PARK_C = PARK_DIR.clone().multiplyScalar(DISH_R + PARK_GAP + PARK_R);
-  const parkTop = (function buildPark(){
+  const parkTop = !PARK_ON ? null : (function buildPark(){
     const g = new THREE.Group(); g.position.copy(PARK_C);
     const top = new THREE.Mesh(new THREE.CircleGeometry(PARK_R, 96), new THREE.MeshBasicMaterial({ color: 0x4f9a3e }));
     top.rotation.x = -Math.PI/2; top.name = 'floor'; g.add(top);
@@ -414,10 +419,10 @@
     scene.add(g);
     return top;
   })();
-  const parkBridgeTop = buildBridge(PARK_DIR, PARK_GAP, DISH_R + PARK_GAP + 14);   // lands a little way into the grass
+  const parkBridgeTop = !PARK_ON ? null : buildBridge(PARK_DIR, PARK_GAP, DISH_R + PARK_GAP + 14);   // lands a little way into the grass
   // third bridge: park ↔ portal island, closing the triangle
   const PI_DIR = ISLE_C.clone().sub(PARK_C).setY(0), PI_D = PI_DIR.length(); PI_DIR.normalize();
-  const triBridgeTop = buildBridge(PI_DIR, PI_D - PARK_R - ISLE_R, PI_D - (ISLE_PATH_R + PATH_W/2), PARK_C, PARK_R - 14, PARK_R);
+  const triBridgeTop = !PARK_ON ? null : buildBridge(PI_DIR, PI_D - PARK_R - ISLE_R, PI_D - (ISLE_PATH_R + PATH_W/2), PARK_C, PARK_R - 14, PARK_R);
 
 
   // ================= dog-style station: the balloon cart (behind the spawn) =================
@@ -511,73 +516,83 @@
       return g;
     }
 
-    // ---------- the balloon factory: dog stands in a glass dome; the pump re-inflates it in a new color ----------
+    // ---------- the balloon lab: a clean round plinth with a single brass arc + nozzle over the dog ----------
+    function engraved(text, w, h, size, color = '#2f8a7d'){                      // small letter-spaced type, no background
+      const c = document.createElement('canvas'); c.width = 1024; c.height = Math.round(1024 * h / w); const x = c.getContext('2d');
+      const draw = () => { x.clearRect(0, 0, c.width, c.height); x.fillStyle = color; x.textAlign = 'center'; x.textBaseline = 'middle';
+        x.font = `800 ${size}px Archivo, "Helvetica Neue", Arial, sans-serif`; if ('letterSpacing' in x) x.letterSpacing = Math.round(size * 0.22) + 'px';
+        x.fillText(text, c.width / 2, c.height / 2 + 2); };
+      draw(); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+      if (document.fonts) document.fonts.load(`800 ${size}px Archivo`).then(() => { draw(); t.needsUpdate = true; }).catch(() => {});
+      return new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false }));
+    }
     function buildFactory(){
-      const g = new THREE.Group(), PAD_Z = 4;
-      const lav = phys(0xc7b2ff), teal = phys(0x8fd6c9), pink = phys(0xff9ec7);
-      const gold = phys(0xf3c14b, { metalness: 0.7, roughness: 0.25 }), chrome = phys(0xdfe3ea, { metalness: 0.9, roughness: 0.2 }), dark = phys(0x2b2230);
-      const base = mesh(new THREE.CylinderGeometry(7.4, 7.8, 1.2, 48), lav, 0, 0.6, PAD_Z, g); stationWalk.push(base);
-      const trim = mesh(new THREE.TorusGeometry(7.4, 0.25, 10, 48), gold, 0, 1.2, PAD_Z, g); trim.rotation.x = Math.PI/2;
-      const dome = new THREE.Mesh(new THREE.SphereGeometry(7.2, 48, 24, 0, Math.PI*2, 0, Math.PI/2),
-        new THREE.MeshPhysicalMaterial({ color: 0xe8f4ff, roughness: 0.02, clearcoat: 1, transparent: true, opacity: 0.16,
-          side: THREE.DoubleSide, depthWrite: false }));
-      dome.position.set(0, 1.2, PAD_Z); g.add(dome);
-      mesh(new THREE.CylinderGeometry(0.9, 0.9, 1, 16), gold, 0, 8.7, PAD_Z, g);                             // nozzle on top
-      mesh(new RoundedBoxGeometry(13, 12, 6, 4, 1), teal, 0, 6, -7, g);                                      // the machine
-      const needles = [-3.5, 0, 3.5].map(x => {
-        mesh(new THREE.CircleGeometry(1.3, 32), phys(0xffffff), x, 8.5, -3.98, g);
-        mesh(new THREE.TorusGeometry(1.3, 0.15, 8, 32), chrome, x, 8.5, -3.95, g);
-        const ng = new THREE.BoxGeometry(0.12, 1.1, 0.05); ng.translate(0, 0.45, 0);
-        return mesh(ng, dark, x, 8.5, -3.9, g);
+      const g = new THREE.Group(), PAD_Z = 0, TOP = 1.6;
+      const cream = phys(0xfff6f1, { roughness: 0.55, clearcoat: 0.25 });
+      const brass = phys(0xd9b46a, { metalness: 0.9, roughness: 0.28, clearcoat: 0.3 });
+      const plinth = mesh(new THREE.CylinderGeometry(8.6, 9.0, TOP, 72), cream, 0, TOP/2, PAD_Z, g); stationWalk.push(plinth);
+      mesh(new THREE.CylinderGeometry(9.02, 9.02, 0.22, 72, 1, true), phys(0x8fd6c9), 0, TOP - 0.45, PAD_Z, g).castShadow = false;   // thin mint band
+      const lab = engraved('BALLOON LAB', 8, 0.9, 96); lab.position.set(0, TOP * 0.42, PAD_Z + 9.03); g.add(lab);
+      // one continuous brass arc from behind the plinth, up and over, ending in a nozzle above the dog
+      const curve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(0, 0, PAD_Z - 12), new THREE.Vector3(0, 12, PAD_Z - 12.5), new THREE.Vector3(0, 19.5, PAD_Z - 8),
+        new THREE.Vector3(0, 20.5, PAD_Z - 2.5), new THREE.Vector3(0, 17.2, PAD_Z) ]);
+      mesh(new THREE.TubeGeometry(curve, 96, 0.42, 16), brass, 0, 0, 0, g);
+      mesh(new THREE.CylinderGeometry(1.5, 1.7, 0.3, 40), brass, 0, 0.15, PAD_Z - 12, g);
+      const noz = mesh(new THREE.CylinderGeometry(0.45, 0.9, 1.4, 32), brass, 0, 16.6, PAD_Z, g);
+      const glowMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, toneMapped: false });
+      const glow = new THREE.Mesh(new THREE.CircleGeometry(0.85, 32), glowMat); glow.rotation.x = Math.PI/2; glow.position.set(0, 15.88, PAD_Z); g.add(glow);
+      // soft ring on the plinth top marks where to stand
+      const ring = new THREE.Mesh(new THREE.RingGeometry(6.4, 6.9, 96), new THREE.MeshBasicMaterial({ color: 0x8fd6c9, transparent: true, opacity: 0.8 }));
+      ring.rotation.x = -Math.PI/2; ring.position.set(0, TOP + 0.02, PAD_Z); g.add(ring);
+      let glowT = 9; const gc = new THREE.Color();
+      factoryFx = { pump(color){ glowT = 0; gc.set(color); glowMat.color.copy(gc); } };
+      stationUpdaters.push(dt => {
+        glowT += dt; glowMat.opacity = glowT < 1.4 ? Math.sin(Math.min(1, glowT / 1.4) * Math.PI) : 0;    // nozzle glows the new color
+        noz.position.y = 16.6 + (glowT < 0.6 ? Math.sin(glowT / 0.6 * Math.PI * 2) * 0.12 : 0);
       });
-      const lights = [0xff6fae, 0xf6934a, 0xf6d04a, 0xa9e05a, 0x56c5f1, 0xb58cff].map((c, i) => {
-        const m = new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 1, toneMapped: false });
-        mesh(new THREE.SphereGeometry(0.35, 12, 8), m, -3.75 + i*1.5, 5.4, -3.95, g).castShadow = false; return m;
-      });
-      { // "BALLOON LAB" sign in Archivo ExtraBold; redrawn once the font has loaded
-        const c = document.createElement('canvas'); c.width = 1024; c.height = 205; const x = c.getContext('2d');
-        const draw = () => {
-          x.clearRect(0, 0, c.width, c.height);
-          x.font = '800 112px Archivo, "Helvetica Neue", Arial, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
-          x.fillStyle = '#2f8a7d'; x.fillText('BALLOON LAB', 512, 108);
-        };
-        draw();
-        const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
-        if (document.fonts) document.fonts.load('800 112px Archivo').then(() => { draw(); t.needsUpdate = true; }).catch(() => {});
-        mesh(new THREE.PlaneGeometry(9, 1.8), new THREE.MeshBasicMaterial({ map: t, transparent: true }), 0, 10.9, -3.97, g).castShadow = false;
-      }
-      const pipe = new THREE.CatmullRomCurve3([new THREE.Vector3(3, 11.5, -7), new THREE.Vector3(3, 16.5, -5),
-        new THREE.Vector3(0, 16, PAD_Z - 1.5), new THREE.Vector3(0, 9.1, PAD_Z)]);
-      const pipeMat = phys(0xff9ec7, { emissive: 0x000000 });
-      mesh(new THREE.TubeGeometry(pipe, 48, 0.55, 12), pipeMat, 0, 0, 0, g);
-      mesh(new THREE.CylinderGeometry(1.1, 1.1, 0.4, 20), phys(0x7a6a9a), -9.5, 0.2, -1, g);                // hand pump
-      mesh(new THREE.CylinderGeometry(0.8, 0.8, 7, 20), pink, -9.5, 3.9, -1, g);
-      const handle = new THREE.Group(); handle.position.set(-9.5, 7.4, -1); g.add(handle);
-      mesh(new THREE.CylinderGeometry(0.15, 0.15, 4, 8), chrome, 0, 2, 0, handle);
-      mesh(new THREE.CylinderGeometry(0.3, 0.3, 3.2, 10), dark, 0, 4, 0, handle).rotation.z = Math.PI/2;
-      mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(-9.5, 0.6, -1), new THREE.Vector3(-8.5, 0.3, -4),
-        new THREE.Vector3(-6.6, 2.5, -6)]), 24, 0.25, 8), dark, 0, 0, 0, g);
-      let strokeT = 9, glow = 0; const glowCol = new THREE.Color();
-      factoryFx = {
-        pump(color){ strokeT = 0; glow = 1; glowCol.set(color); },
-      };
-      stationUpdaters.push((dt, t) => {
-        strokeT += dt; glow = Math.max(0, glow - dt * 0.9);
-        const busy = strokeT < 1.3;
-        needles.forEach((n, i) => { n.rotation.z = busy ? Math.sin(t*14 + i*2) * 1.3 : Math.sin(t*(0.9 + i*0.6) + i) * 0.9; });
-        lights.forEach((m, i) => { m.emissiveIntensity = busy ? (Math.sin(t*18 - i) > 0 ? 2.2 : 0.3) : (Math.sin(t*3 - i*0.8) > 0.2 ? 1.6 : 0.25); });
-        handle.position.y = 7.4 - (strokeT < 0.6 ? Math.abs(Math.sin(Math.PI * strokeT / 0.3)) * 2.6 : 0);   // two quick pumps
-        pipeMat.emissive.copy(glowCol).multiplyScalar(glow * 0.9);
-      });
-      makePad(g, 5.5, PAD_Z);
       return { g, padZ: PAD_Z };
     }
 
-    // the balloon factory, 1.5× size (so the dog fits in the dome), right behind where the dog spawns, facing the center
-    { const { g, padZ } = buildFactory();
-      g.scale.setScalar(2.1);
-      const fa = (4/5)*Math.PI*2 - Math.PI/2;                  // rim spot #4
-      g.position.set(Math.cos(fa)*84, 0, Math.sin(fa)*84);
+    // ---------- the dressing-room vanity: a bulb-framed mirror (it really reflects), pouf stool, side table, rug ----------
+    function buildVanity(){
+      const g = new THREE.Group();
+      const W = 14, H = 18, cy = 2.5 + H/2, frameMat = phys(0xffd6e8, { clearcoat: 1 }), gold = phys(0xf3c14b, { metalness: 0.7, roughness: 0.25 });
+      const mirror = new Reflector(new THREE.PlaneGeometry(W, H), {
+        clipBias: 0.003, textureWidth: 1024, textureHeight: 1316, color: 0xe6dfe8 });
+      mirror.position.set(0, cy, 0.05); g.add(mirror);
+      const T = 1.4, D = 1.2;
+      mesh(new THREE.BoxGeometry(W + 2*T, T, D), frameMat, 0, cy + H/2 + T/2, 0, g);
+      mesh(new THREE.BoxGeometry(W + 2*T, T, D), frameMat, 0, cy - H/2 - T/2, 0, g);
+      mesh(new THREE.BoxGeometry(T, H, D), frameMat, -W/2 - T/2, cy, 0, g);
+      mesh(new THREE.BoxGeometry(T, H, D), frameMat,  W/2 + T/2, cy, 0, g);
+      mesh(new THREE.BoxGeometry(W + 2*T, H + 2*T, 0.4), frameMat, 0, cy, -0.5, g);           // back panel
+      for (const x of [-6, 6]) mesh(new THREE.BoxGeometry(1.4, 1.1, 4), frameMat, x, 0.55, 0, g);   // feet
+      const bulbMat = new THREE.MeshStandardMaterial({ color: 0xfff4d6, emissive: 0xfff1d0, emissiveIntensity: 1.8, toneMapped: false });
+      const bulbGeo = new THREE.SphereGeometry(0.62, 16, 12), z = D/2 + 0.2;
+      for (let i = 0; i < 7; i++) mesh(bulbGeo, bulbMat, -W/2 + i*W/6, cy + H/2 + T/2, z, g).castShadow = false;
+      for (let i = 1; i < 7; i++) for (const x of [-W/2 - T/2, W/2 + T/2]) mesh(bulbGeo, bulbMat, x, cy + H/2 - i*H/7, z, g).castShadow = false;
+      // pouf stool
+      mesh(new THREE.CylinderGeometry(0.45, 0.6, 3, 12), gold, -7, 1.5, 9, g);
+      const cushion = mesh(new THREE.SphereGeometry(2.7, 28, 16), phys(0xff8fc0, { roughness: 0.7, clearcoat: 0.2 }), -7, 3.8, 9, g); cushion.scale.set(1, 0.45, 1);
+      // side table + perfume bottles
+      mesh(new THREE.CylinderGeometry(0.3, 0.5, 5, 12), gold, 8, 2.5, 6, g);
+      mesh(new THREE.CylinderGeometry(2.4, 2.4, 0.35, 32), phys(0xffffff), 8, 5.1, 6, g);
+      [[7.2, 0xb58cff], [8.9, 0x56c5f1]].forEach(([x, c], i) => {
+        const glass = phys(c, { transparent: true, opacity: 0.75, roughness: 0.05, clearcoat: 1 });
+        mesh(new THREE.CylinderGeometry(0.6, 0.6, 1.6 - i*0.4, 16), glass, x, 6.1 - i*0.2, 6, g);
+        mesh(new THREE.SphereGeometry(0.35, 12, 8), gold, x, 7.1 - i*0.4, 6, g);
+      });
+      // rug in front (the pad)
+      const rug = mesh(new THREE.CircleGeometry(7, 48), phys(0xe7c6ff, { roughness: 0.9, clearcoat: 0 }), 0, 0.2, 9, g);
+      rug.rotation.x = -Math.PI/2;
+      makePad(g, 7.6, 9);
+      return { g, padZ: 9 };
+    }
+    // the dressing-room vanity (the dog editor), back-left of the island, facing the center
+    { const { g, padZ } = buildVanity();
+      const fa = (4/5)*Math.PI*2 - Math.PI/2 - 0.15;
+      g.position.set(Math.cos(fa)*(DISH_R - 24), 0, Math.sin(fa)*(DISH_R - 24));
       g.rotation.y = yawToward(g.position, new THREE.Vector3(0, 0, 0));
       scene.add(g); g.updateMatrixWorld(true);
       stylePads.push({ pos: g.localToWorld(new THREE.Vector3(0, 0, padZ)), facing: g.rotation.y }); }
@@ -592,7 +607,7 @@
     sunDir: { value: SUN_OFF.clone().normalize() },
     c1: { value: new THREE.Vector3(0, 0, DISH_R) },                 // (x, z, radius) of each island
     c2: { value: new THREE.Vector3(ISLE_C.x, ISLE_C.z, ISLE_R) },
-    c3: { value: new THREE.Vector3(PARK_C.x, PARK_C.z, PARK_R) },
+    c3: { value: new THREE.Vector3(PARK_C.x, PARK_C.z, PARK_ON ? PARK_R : -1e5) },   // (no foam ring when the park is off)
   };
   const ocean = new THREE.Mesh(
     new THREE.PlaneGeometry(4400, 4400, 1, 1),
@@ -1277,6 +1292,7 @@
   function finishIntro(){
     if (introDone) return;
     introDone = true; introClock = 99;
+    setTimeout(() => document.getElementById('caption').classList.add('gone'), 9000);
     dogRig.visible = true; dogRig.scale.setScalar(1);
     beam.visible = false;
     camMode = 'play'; camDistT = CAM.play.dist; camPitchT = CAM.play.pitch;
@@ -1314,14 +1330,14 @@
   const STYLE_KEY = 'lorelai-dog-style';
   const DOG_COLORS = ['#ef5aa8', '#ef4a5a', '#f6934a', '#f6d04a', '#a9e05a', '#56c5f1', '#6a86ef', '#b58cff', '#f7f3f5', '#2b2230'];
   const FINISHES = {
-    shiny:  { label: 'shiny',  roughness: 0.3,  metalness: 0.05, clearcoat: 0.6, clearcoatRoughness: 0.1, iridescence: 0 },
-    matte:  { label: 'matte',  roughness: 0.85, metalness: 0,    clearcoat: 0,   clearcoatRoughness: 0,   iridescence: 0 },
-    chrome: { label: 'chrome', roughness: 0.07, metalness: 1,    clearcoat: 1,   clearcoatRoughness: 0.05, iridescence: 0 },
-    pearl:  { label: 'pearl',  roughness: 0.25, metalness: 0.1,  clearcoat: 1,   clearcoatRoughness: 0.1, iridescence: 1 },
+    shiny:  { label: 'Shiny',  roughness: 0.3,  metalness: 0.05, clearcoat: 0.6, clearcoatRoughness: 0.1, iridescence: 0 },
+    matte:  { label: 'Matte',  roughness: 0.85, metalness: 0,    clearcoat: 0,   clearcoatRoughness: 0,   iridescence: 0 },
   };
   const HATS = { none: 'none', party: 'party hat', crown: 'crown', flower: 'flower', bow: 'bow' };
   let style = { color: '#ef5aa8', finish: 'shiny', hat: 'none' };
   try { Object.assign(style, JSON.parse(localStorage.getItem(STYLE_KEY) || '{}')); } catch (e) {}
+  if (!FINISHES[style.finish]) style.finish = 'shiny';               // chrome / pearl were retired
+  style.hat = 'none';                                               // accessories were retired
 
   const hatSlot = new THREE.Group();          // sits on top of the dog's head (in dogRig space)
   function accMat(c, o = {}){ return new THREE.MeshPhysicalMaterial(Object.assign({ color: c, roughness: 0.3, clearcoat: 0.8 }, o)); }
@@ -1440,7 +1456,6 @@
       }
     };
     opts('finishOpts', FINISHES, 'finish');
-    opts('hatOpts', HATS, 'hat');
     document.getElementById('styleDone').onclick = () => exitStyle();
     ['pointerdown', 'wheel'].forEach(ev => panel.addEventListener(ev, e => e.stopPropagation()));
     refreshPanel();
@@ -1699,7 +1714,7 @@
   const fromField = (u, w, out) => out.set(PARK_C.x + FL.x*u + PARK_DIR.x*w, 0, PARK_C.z + FL.z*u + PARK_DIR.z*w);
   const field = new THREE.Group();
   field.position.copy(PARK_C); field.rotation.y = Math.atan2(-FL.z, FL.x);   // local +x = long axis, local +z = PARK_DIR
-  scene.add(field);
+  scene.add(field); field.visible = PARK_ON;
   (function buildField(){
     const PX = 8, c = document.createElement('canvas'); c.width = FIELD_L*PX; c.height = FIELD_W*PX;
     const x = c.getContext('2d');
@@ -1725,7 +1740,7 @@
     const px = x.getImageData(0, 0, c.width, c.height).data;
     const whiteAt = (u, w) => { const cx = Math.round((u + FIELD_L/2) * PX), cy = Math.round((w + FIELD_W/2) * PX);
       if (cx < 0 || cy < 0 || cx >= c.width || cy >= c.height) return false; return px[(cy * c.width + cx) * 4] > 160; };
-    buildGrass((wx, wz) => {
+    if (PARK_ON) buildGrass((wx, wz) => {
       const rx = wx - PARK_C.x, rz = wz - PARK_C.z;
       const u = rx * (-PARK_DIR.z) + rz * PARK_DIR.x, w = rx * PARK_DIR.x + rz * PARK_DIR.z;
       const near = m => whiteAt(u, w) || whiteAt(u + m, w) || whiteAt(u - m, w) || whiteAt(u, w + m) || whiteAt(u, w - m) ||
@@ -1783,7 +1798,7 @@
     }
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
     const m = new THREE.Mesh(geo, new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.35, clearcoat: 0.6, clearcoatRoughness: 0.2 }));
-    m.castShadow = true; scene.add(m); return m;
+    m.castShadow = true; m.visible = PARK_ON; scene.add(m); return m;
   })();
   const ballPos = new THREE.Vector3(), ballVel = new THREE.Vector3();
   let ballVy = 0, ballY = BALL_R, kickCD = 0, scoredT = -1;
@@ -1808,6 +1823,7 @@
     };
   })();
   function updateBall(dt){
+    if (!PARK_ON) return;
     // how the dog is moving (for kick strength)
     dogVel.copy(dogRig.position).sub(prevDog).divideScalar(Math.max(dt, 1e-3)); dogVel.y = 0; prevDog.copy(dogRig.position);
     kickCD -= dt;
@@ -2472,78 +2488,54 @@
       return { g, triggers: [{ lx: 0, lz: PADZ, r: 4.5, fire(){ tvFire(); } }] };
     }
 
-    // "CHOOSE UR THEME" wall — three big buttons: bump one with the dog, or click it
-    function themeWall(){
-      const g = new THREE.Group(), HW = 17, WD = 1.2;                           // half width, half depth of the wall
-      const WALL = '#8fd6c9', wallMat = phys(0x8fd6c9);                          // same mint as the balloon lab machine
-      add(new RoundedBoxGeometry(HW*2 + 1.4, 1.2, WD*2 + 2.4, 3, 0.4), phys(0x6fc2b3), 0, 0.6, 0.6, g);          // plinth
-      add(new RoundedBoxGeometry(HW*2, 16, WD*2, 4, 0.8), wallMat, 0, 9.2, 0, g);                                    // wall
-      const title = add(new THREE.PlaneGeometry(HW*2 - 3, 2.9), label('CHOOSE YOUR GAME THEME', { w: 1800, h: 180, bg: null, fg: '#2f8a7d', size: 118 }), 0, 14.3, WD + 0.02, g);
-      title.castShadow = false;
-      const defs = [{ id: 'classic', c: 0xffffff, text: 'CLASSIC', rainbow: true, fg: 'rainbow' },
-                    { id: 'neon', c: 0xb026ff, text: 'NEON', glow: 0x9d00ff, fg: '#b026ff' },
-                    { id: null, c: 0xc9c4d0, text: 'SOON' }];
-      const rainbowFace = (() => {                                              // rainbow stripes for the classic button
-        const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d');
-        const cols = ['#ef5566', '#f0794c', '#f6b74a', '#a9e05a', '#56c5f1', '#6a86ef', '#b58cff'];
-        cols.forEach((col, i) => { x.fillStyle = col; x.fillRect(0, Math.floor(i*256/cols.length), 256, Math.ceil(256/cols.length) + 1); });
-        const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
-      })();
-      const rainbowEdge = (() => {                                              // edge stripes that line up with the face's stripes
-        const cols = ['#ef5566', '#f0794c', '#f6b74a', '#a9e05a', '#56c5f1', '#6a86ef', '#b58cff'];
-        const c = document.createElement('canvas'); c.width = 512; c.height = 8; const x = c.getContext('2d');
-        for (let u = 0; u < 512; u++){ const th = (u + 0.5) / 512 * Math.PI * 2, v = 0.5 + 0.5 * Math.sin(th);
-          x.fillStyle = cols[Math.min(cols.length - 1, Math.floor((1 - v) * cols.length))]; x.fillRect(u, 0, 1, 8); }
-        const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
-      })();
-      const btns = defs.map((d, i) => {
-        const x = (i - 1) * 10.5, y = 7.6;
-        const capMat = d.rainbow ? [phys(0xffffff, { map: rainbowEdge }), phys(0xffffff, { map: rainbowFace }), phys(0xffffff)]
-          : phys(d.c, d.glow ? { emissive: d.glow, emissiveIntensity: 0.25 } : {});
-        let halo = null;
-        if (false && d.glow){                                                    // (glow halo turned off)
-          const hc = document.createElement('canvas'); hc.width = hc.height = 128; const hx = hc.getContext('2d');
-          const rg = hx.createRadialGradient(64, 64, 10, 64, 64, 64); rg.addColorStop(0, 'rgba(190,80,255,1)'); rg.addColorStop(0.45, 'rgba(176,38,255,0.55)'); rg.addColorStop(1, 'rgba(176,38,255,0)');
-          hx.fillStyle = rg; hx.fillRect(0, 0, 128, 128);
-          halo = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(hc), transparent: true,
-            blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
-          halo.position.set(x, y, WD + 0.06); g.add(halo);
-        }
-        const cap = add(new THREE.CylinderGeometry(2.9, 2.9, 1.6, 48), capMat, x, y, WD + 0.8, g);
-        cap.rotation.x = Math.PI/2;
-        const ring = new THREE.Mesh(new THREE.RingGeometry(3.7, 4.4, 48), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true,
-          opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })); ring.position.set(x, y, WD + 0.05); g.add(ring);
-        add(new THREE.PlaneGeometry(8, 1.6), label(d.text, { w: 800, h: 160, bg: null, fg: '#2f8a7d', size: 112 }),
-          x, 2.9, WD + 0.02, g).castShadow = false;
-        if (d.id) clickables.push({ mesh: cap, onClick: () => pick(d.id) });
-        return { ...d, x, cap, ring, halo };
+    function engraved(text, w, h, size, color = '#2f8a7d'){                      // small letter-spaced type, no background
+      const c = document.createElement('canvas'); c.width = 1024; c.height = Math.round(1024 * h / w); const x = c.getContext('2d');
+      const draw = () => { x.clearRect(0, 0, c.width, c.height); x.fillStyle = color; x.textAlign = 'center'; x.textBaseline = 'middle';
+        x.font = `800 ${size}px Archivo, "Helvetica Neue", Arial, sans-serif`; if ('letterSpacing' in x) x.letterSpacing = Math.round(size * 0.22) + 'px';
+        x.fillText(text, c.width / 2, c.height / 2 + 2); };
+      draw(); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+      if (document.fonts) document.fonts.load(`800 ${size}px Archivo`).then(() => { draw(); t.needsUpdate = true; }).catch(() => {});
+      return new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false }));
+    }
+    // "choose your game theme": three slim pedestals, each holding a sphere — walk into one (or click its sphere)
+    function themePedestals(){
+      const g = new THREE.Group(), GAPX = 12, PH = 4.4, PR = 3.0, SR = 2.1;
+      const cream = phys(0xfff6f1, { roughness: 0.55, clearcoat: 0.25 });
+      const brass = phys(0xd9b46a, { metalness: 0.9, roughness: 0.28, clearcoat: 0.3 });
+      const stripes = (() => { const c = document.createElement('canvas'); c.width = 512; c.height = 256; const x = c.getContext('2d');
+        ['#ef5566', '#f0794c', '#f6b74a', '#a9e05a', '#56c5f1', '#6a86ef', '#b58cff'].forEach((col, i, a) => { x.fillStyle = col; x.fillRect(0, Math.floor(i*256/a.length), 512, Math.ceil(256/a.length) + 1); });
+        const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+      const defs = [
+        { id: 'classic', text: 'CLASSIC', mat: phys(0xffffff, { map: stripes, roughness: 0.3, clearcoat: 0.9 }) },
+        { id: 'neon',    text: 'NEON',    mat: phys(0xb026ff, { emissive: 0x7a00ff, emissiveIntensity: 0.35, roughness: 0.2, clearcoat: 1 }) },
+        { id: null,      text: 'SOON',    mat: phys(0xffffff, { roughness: 0.6, transparent: true, opacity: 0.55 }) },
+      ];
+      const items = defs.map((d, i) => {
+        const x = (i - 1) * GAPX;
+        add(new THREE.CylinderGeometry(PR, PR + 0.25, PH, 64), cream, x, PH/2, 0, g);
+        add(new THREE.CylinderGeometry(PR + 0.02, PR + 0.02, 0.18, 64, 1, true), brass, x, PH - 0.09, 0, g).castShadow = false;
+        const lab = engraved(d.text, 5, 0.75, 96); lab.position.set(x, 1.2, PR + 0.17); g.add(lab);
+        const sphere = add(new THREE.SphereGeometry(SR, 48, 32), d.mat, x, PH + SR + 0.15, 0, g);
+        if (d.id) clickables.push({ mesh: sphere, onClick: () => pick(d.id) });
+        return { ...d, x, sphere, ph: i * 1.7 };
       });
+      const title = engraved('CHOOSE YOUR GAME THEME', 20, 1.3, 84); title.rotation.x = -Math.PI/2 + 0.0; title.position.set(0, 0.06, PR + 3.4); g.add(title);
       function pick(id){ if (!id || id === theme || themeSwitching) return; sfx.padChime(); switchTheme(id); }
       const inv = new THREE.Matrix4(), lp = new THREE.Vector3(), wp = new THREE.Vector3();
       stationUpdaters.push((dt, t) => {
-        for (const b of btns){
-          const on = b.id === theme;
-          b.cap.position.z += ((on ? WD + 0.1 : WD + 0.9) - b.cap.position.z) * Math.min(1, dt * 14);    // active one sits pushed down into the wall
-          b.ring.material.opacity = 0;                                            // no ring — pressed-in says it all
+        for (const it of items){
+          const on = it.id === theme, targetY = PH + SR + (on ? 1.4 : 0.15);
+          it.sphere.position.y += (targetY + (on ? Math.sin(t * 1.3 + it.ph) * 0.18 : 0) - it.sphere.position.y) * Math.min(1, dt * 5);
+          it.sphere.rotation.y += dt * (on ? 0.5 : 0);
         }
-        // solid wall: the dog bumps into it
+        // the dog bumps into the pedestals instead of walking through them
         inv.copy(g.matrixWorld).invert(); lp.copy(dogRig.position).applyMatrix4(inv);
-        const R = 2.4, ex = HW + R - Math.abs(lp.x), ez = (WD + 1.6 + R) - Math.abs(lp.z);
-        if (ex > 0 && ez > 0){ if (ez < ex) lp.z = Math.sign(lp.z || 1) * (WD + 1.6 + R); else lp.x = Math.sign(lp.x) * (HW + R);
-          wp.copy(lp).applyMatrix4(g.matrixWorld); dogRig.position.x = wp.x; dogRig.position.z = wp.z; }
+        for (const it of items){ const dx = lp.x - it.x, dz = lp.z, d = Math.hypot(dx, dz), R = PR + 2.4;
+          if (d < R && d > 1e-3){ lp.x = it.x + dx / d * R; lp.z = dz / d * R; wp.copy(lp).applyMatrix4(g.matrixWorld); dogRig.position.x = wp.x; dogRig.position.z = wp.z; } }
       });
-      return { g, triggers: btns.filter(b => b.id).map(b => ({ lx: b.x, lz: WD + 1.6 + 2.4, r: 2.8, fire: () => pick(b.id) })) };
+      return { g, triggers: items.filter(it => it.id).map(it => ({ lx: it.x, lz: 0, r: PR + 2.4 + 0.5, fire: () => pick(it.id) })) };
     }
-    // to the right of the balloon lab (as you look at it from the middle), facing the center
-    { const { g, triggers } = themeWall();
-      const a = (4/5)*Math.PI*2 - Math.PI/2 + 0.78;
-      g.scale.setScalar(1.45);                                                 // bigger board
-      g.position.set(Math.cos(a)*88, 0, Math.sin(a)*88);
-      g.rotation.y = yawToward(g.position, new THREE.Vector3(0, 0, 0));
-      scene.add(g); g.updateMatrixWorld(true);
-      for (const t of triggers) themeTriggers.push({ pos: g.localToWorld(new THREE.Vector3(t.lx, 0, t.lz)), r: t.r, fire: t.fire, armed: true });
-      hintSpots.push({ pos: g.localToWorld(new THREE.Vector3(0, 0, 6)), r: 24,
-        text: '<b>Choose your theme:</b> walk into a button on the wall, or click it' }); }
+    // (theme chooser removed for now — themePedestals() is kept above, unused)
   })();
   function updateThemeTriggers(){
     if (!introDone) return;
@@ -2591,7 +2583,7 @@
       dogRig.position.x += Math.sin(heading) * speed * move * dt;
       dogRig.position.z += Math.cos(heading) * speed * move * dt;
     }
-    if (dogRig.position.y < GOAL_H) pushOutOfGoals(dogRig.position, 2.6);     // nets are solid
+    if (PARK_ON && dogRig.position.y < GOAL_H) pushOutOfGoals(dogRig.position, 2.6);     // nets are solid
     // once you walk or turn (and aren't dragging), the camera eases back behind the dog
     if ((move || turning) && dragId === null) yawOffset *= Math.exp(-dt * 3);
     if (styleMode){
@@ -2626,7 +2618,7 @@
       else if (restPos){ restoreRest(); }
 
       // climb physics: follow the surface under the dog (dish floor, or up onto the palette)
-      const walk = [dishTop, isleTop, bridgeTop, parkTop, parkBridgeTop, triBridgeTop, ...stationWalk, ...themeCaps]; if (paletteObj) walk.push(paletteObj);
+      const walk = [dishTop, isleTop, bridgeTop, parkTop, parkBridgeTop, triBridgeTop, ...stationWalk, ...themeCaps].filter(Boolean); if (paletteObj) walk.push(paletteObj);
       downRay.set(_downOrigin.set(dogRig.position.x, 300, dogRig.position.z), _down);
       let hit = downRay.intersectObjects(walk, true)[0];
       if (!hit){
