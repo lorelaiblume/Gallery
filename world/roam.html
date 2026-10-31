@@ -403,7 +403,7 @@
   const PARK_A = (1/5)*Math.PI*2 - Math.PI/2;                // leaves from rim spot #1 (front-left of the spawn)
   const PARK_DIR = new THREE.Vector3(Math.cos(PARK_A), 0, Math.sin(PARK_A));
   const PARK_R = 120, PARK_GAP = 80;
-  const PARK_ON = false;                                        // the soccer park is off for now (flip to true to bring it back)
+  const PARK_ON = true;                                         // the soccer park is off for now (flip to true to bring it back)
   const PARK_C = PARK_DIR.clone().multiplyScalar(DISH_R + PARK_GAP + PARK_R);
   const parkTop = !PARK_ON ? null : (function buildPark(){
     const g = new THREE.Group(); g.position.copy(PARK_C);
