@@ -589,10 +589,10 @@
       makePad(g, 7.6, 9);
       return { g, padZ: 9 };
     }
-    // the dressing-room vanity (the dog editor), back-left of the island, facing the center
+    // the dressing-room vanity (the dog editor): left of the portal bridge, mirroring the boombox on its right
     { const { g, padZ } = buildVanity();
-      const fa = (4/5)*Math.PI*2 - Math.PI/2 - 0.15;
-      g.position.set(Math.cos(fa)*(DISH_R - 24), 0, Math.sin(fa)*(DISH_R - 24));
+      const fa = (2/5)*Math.PI*2 - Math.PI/2 - (Math.PI/2 - ((2/5)*Math.PI*2 - Math.PI/2));
+      g.position.set(Math.cos(fa)*(DISH_R - 18), 0, Math.sin(fa)*(DISH_R - 18));
       g.rotation.y = yawToward(g.position, new THREE.Vector3(0, 0, 0));
       scene.add(g); g.updateMatrixWorld(true);
       stylePads.push({ pos: g.localToWorld(new THREE.Vector3(0, 0, padZ)), facing: g.rotation.y }); }
